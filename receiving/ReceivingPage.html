@@ -1,0 +1,558 @@
+<!-- PureTech — Receiving section. Pasted into Index.html. -->
+<style>
+  .receiving { max-width: 1240px; margin: 0 auto; padding: 28px 16px 60px; }
+  .receiving h1 { margin: 0; font-size: 30px; font-weight: 700; letter-spacing: -0.02em; }
+  .rc-cols { display: grid; grid-template-columns: minmax(0, 1fr) 400px; gap: 32px; align-items: start; }
+  @media (max-width: 960px) { .rc-cols { grid-template-columns: minmax(0, 1fr); } }
+  .rc-msg { margin: 12px 0 4px; font-size: 17px; color: var(--muted); }
+  .rc-msg b { color: var(--text); font-weight: 600; }
+  .rc-msg.err { color: var(--bad); font-weight: 600; }
+  .rc-note { margin: 16px 0 0; padding: 12px 16px; border-radius: 12px; background: var(--ok-bg); border: 1px solid #bbf7d0;
+             color: #166534; font-weight: 600; }
+  .rc-note:empty { display: none; }
+  .rc-hint { margin: 0; color: var(--muted); font-size: 16px; }
+  .rc-more { margin-top: 20px; }
+
+  /* Invoice cards */
+  .rc-card { position: relative; display: flex; flex-direction: column; gap: 4px; margin-top: 12px; padding: 20px 56px 20px 22px;
+             background: var(--card); border: 1px solid var(--line); border-radius: 14px; cursor: pointer; }
+  .rc-card:hover { border-color: #a8a29e; }
+  .rc-card.done { background: transparent; }
+  .rc-who { font-size: 16px; color: var(--muted); }
+  .rc-inv { font-size: 26px; font-weight: 700; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
+  .rc-inv span { font-weight: 400; color: var(--muted); }
+  .rc-inv.none { font-size: 18px; font-weight: 400; color: var(--muted); }
+  .rc-notes { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 18px; margin-top: 4px; font-size: 16px; }
+  .rc-notes a { color: var(--muted); }
+  .rc-tag { font-weight: 500; color: #52525b; }
+  .rc-tag.warn { color: var(--warn); }
+  .rc-tag.ok { color: var(--ok); }
+  .rc-arrow { position: absolute; right: 22px; top: 50%; transform: translateY(-50%); color: #a1a1aa; }
+
+  /* Right column: the last 7 days */
+  .rc-side { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 20px; position: sticky; top: 16px; }
+  .rc-sidehead { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+  .rc-sidehead h2 { margin: 0; font-size: 22px; font-weight: 700; }
+  .rc-side h3, .rc-report h3 { display: flex; align-items: baseline; gap: 8px; margin: 20px 0 4px; }
+  .rc-side h3 .lbl, .rc-report h3 .lbl { color: var(--text); }
+  .rc-side h3 .n, .rc-report h3 .n { font-size: 15px; color: var(--muted); }
+  .rc-pl { display: flex; align-items: flex-start; gap: 12px; padding: 12px 0; border-top: 1px solid #f0efed; }
+  .rc-pl .what { flex: 1; min-width: 0; }
+  .rc-pl .what b { font-size: 19px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+  .rc-pl .what em { font-style: normal; color: var(--muted); }
+  .rc-pl .what span { display: block; font-size: 15px; color: var(--muted); }
+  .rc-pl .what .ok { color: var(--ok); font-weight: 500; }
+  .rc-pl .what .warn { color: var(--warn); font-weight: 500; }
+  .rc-pl.done .what b, .rc-pl.done .what em { text-decoration: line-through; color: var(--muted); }
+  .rc-check { flex: none; display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 64px;
+              font-size: 14px; font-weight: 600; color: var(--muted); cursor: pointer; }
+  .rc-check input { width: 28px; height: 28px; margin: 0; accent-color: var(--ok); cursor: pointer; }
+
+  /* Pop-up */
+  .rc-dialog { width: min(760px, calc(100vw - 24px)); max-height: calc(100vh - 32px); padding: 0; border: 0;
+               border-radius: 16px; background: var(--card); color: var(--text); box-shadow: 0 24px 64px rgba(24, 24, 27, .25); }
+  .rc-dialog::backdrop { background: rgba(24, 24, 27, .45); }
+  .rc-dbody { padding: 24px 24px 8px; }
+  .rc-dhead { display: flex; align-items: flex-start; gap: 16px; }
+  .rc-dhead .grow { flex: 1; min-width: 0; }
+  .rc-x { width: 48px; height: 48px; border-radius: 10px; font-size: 22px; color: var(--muted); }
+  .rc-x:hover { background: var(--soft); color: var(--text); }
+  .rc-invrow { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; margin-top: 4px; }
+  .rc-invrow label { font-size: 26px; color: var(--muted); }
+  .rc-invrow input { flex: 1 1 220px; min-width: 0; height: 56px; padding: 0 14px; font-size: 26px; font-weight: 700;
+                     text-transform: uppercase; border: 1px solid var(--line-strong); border-radius: 12px; background: var(--card); }
+  .rc-dsub { margin: 6px 0 0; font-size: 16px; color: var(--muted); }
+  .rc-dsub a { color: var(--muted); }
+  .rc-sec { margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--line); }
+  .rc-sec h3 { margin: 0 0 4px; font-size: 20px; }
+  .rc-sec h3 span { display: block; font-size: 15px; font-weight: 400; color: var(--muted); }
+  .rc-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; padding: 10px 0; }
+  .rc-part { flex: 1 1 200px; min-width: 0; }
+  .rc-part b { display: block; font-size: 20px; font-variant-numeric: tabular-nums; }
+  .rc-part span { display: block; font-size: 15px; color: var(--muted); }
+  .rc-partin { flex: 1 1 200px; min-width: 0; height: 56px; padding: 0 14px; font-size: 20px; font-weight: 600;
+               text-transform: uppercase; border: 1px solid var(--line-strong); border-radius: 12px; background: var(--card); }
+  .rc-dialog input:focus { outline: none; border-color: var(--text); box-shadow: 0 0 0 1px var(--text); }
+  .rc-stepper { display: flex; align-items: center; border: 1px solid var(--line-strong); border-radius: 12px; overflow: hidden; }
+  .rc-stepper button { width: 52px; height: 52px; font-size: 26px; font-weight: 500; }
+  .rc-stepper button:hover { background: var(--soft); }
+  .rc-stepper button:disabled { color: #c4c4c8; background: var(--card); }
+  .rc-stepper .n { min-width: 64px; text-align: center; font-size: 24px; font-weight: 700; font-variant-numeric: tabular-nums;
+                   line-height: 52px; border-left: 1px solid var(--line); border-right: 1px solid var(--line); }
+  .rc-rm { min-height: 48px; padding: 0 12px; border-radius: 10px; font-size: 16px; font-weight: 500; color: var(--muted); }
+  .rc-rm:hover { color: var(--danger); background: #fef2f2; }
+  .rc-add { margin-top: 4px; }
+  .rc-dfoot { position: sticky; bottom: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 10px 20px;
+              padding: 16px 24px; border-top: 1px solid var(--line); background: rgba(255, 255, 255, .97); }
+  .rc-dfoot .sum { flex: 1 1 200px; color: var(--muted); }
+  .rc-dfoot .err { flex-basis: 100%; color: var(--danger); font-weight: 600; }
+  .rc-dfoot .btn.primary { height: 60px; padding: 0 32px; font-size: 20px; }
+
+  /* Week report */
+  .rc-back { min-height: 44px; font-size: 17px; font-weight: 500; color: var(--muted); }
+  .rc-back:hover { color: var(--text); }
+  .rc-rtop { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin: 12px 0 8px; }
+  .rc-weeknav { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  .rc-weeknav .btn.sq { width: 48px; padding: 0; }
+  .rc-weeknav .label { min-width: 220px; text-align: center; font-size: 20px; font-weight: 600; }
+  .rc-report { max-width: 980px; }
+  .rc-total { margin: 8px 0 0; font-size: 18px; }
+  .rc-tablewrap { overflow-x: auto; background: var(--card); border: 1px solid var(--line); border-radius: 14px; }
+  .rc-table { width: 100%; border-collapse: collapse; font-size: 16px; }
+  .rc-table th { padding: 10px 14px; text-align: left; font-size: 13px; font-weight: 600; text-transform: uppercase;
+                 letter-spacing: .06em; color: var(--muted); border-bottom: 1px solid var(--line); }
+  .rc-table td { padding: 12px 14px; border-top: 1px solid #f0efed; vertical-align: top; }
+  .rc-table tr:first-child td { border-top: 0; }
+  .rc-table td.part { font-weight: 600; font-variant-numeric: tabular-nums; }
+  .rc-table td.part span { display: block; font-weight: 400; font-size: 14px; color: var(--muted); }
+  .rc-table .ok { color: var(--ok); }
+  .rc-table .warn { color: var(--warn); font-weight: 500; }
+
+  @media print {
+    .appbar, .rc-noprint, body > div:first-of-type:not(.receiving) { display: none !important; }
+    body { background: #fff; font-size: 12pt; }
+    .receiving { padding: 0; max-width: none; }
+    .rc-tablewrap { border: 0; overflow: visible; }
+    .rc-table tr { break-inside: avoid; }
+  }
+</style>
+
+<main id="receivingSection" class="receiving" hidden>
+  <div class="rc-cols" id="rcMain">
+    <section>
+      <h1>Invoices to check</h1>
+      <div class="rc-msg" id="rcMsg">Looking for invoices in your email…</div>
+      <div class="rc-note" id="rcNote" role="status"></div>
+      <div id="rcCards"></div>
+    </section>
+    <aside class="rc-side" aria-labelledby="rcSideTitle">
+      <div class="rc-sidehead">
+        <h2 id="rcSideTitle">Last 7 days</h2>
+        <button class="btn" id="rcReportBtn">Week report</button>
+      </div>
+      <p class="rc-hint">Tick a missing or extra part when it has been sorted out. Back orders tick off by themselves when the part comes in.</p>
+      <div id="rcRecent"><p class="rc-hint">Loading…</p></div>
+    </aside>
+  </div>
+
+  <section id="rcReport" class="rc-report" hidden>
+    <button class="rc-back rc-noprint" id="rcReportBack">◀ Back to receiving</button>
+    <div class="rc-rtop">
+      <h1>Week report</h1>
+      <div class="rc-weeknav rc-noprint">
+        <button class="btn sq" id="rcPrev" aria-label="Week before">◀</button>
+        <span class="label" id="rcWeekLabel"></span>
+        <button class="btn sq" id="rcNext" aria-label="Week after">▶</button>
+        <button class="btn primary" id="rcPrint">Print</button>
+      </div>
+    </div>
+    <div id="rcReportBody"></div>
+  </section>
+
+  <dialog class="rc-dialog" id="rcDialog" aria-labelledby="rcDlgLabel"></dialog>
+</main>
+
+<script>
+const Receiving = (() => {
+  // Problems in the order the pop-up asks about them. The right column and the report use
+  // the server's order (Missing, Extra, Back order).
+  const PROBLEMS = {
+    'Back order': { title: 'Back ordered', hint: 'Read from the B/O column of the invoice. Fix it if it is wrong.',
+                    add: '+ Add back-ordered part', many: 'back-ordered' },
+    'Missing': { title: 'Missing', hint: 'On the invoice but not in the delivery.', add: '+ Add missing part', many: 'missing' },
+    'Extra': { title: 'Extra', hint: 'In the delivery but not on the invoice.', add: '+ Add extra part', many: 'extra' },
+  };
+  const ASK_ORDER = ['Back order', 'Missing', 'Extra'];
+  const SHOW_ORDER = ['Missing', 'Extra', 'Back order'];
+  const MAX = 999;
+
+  // Dates are plain yyyy-mm-dd strings, worked out in UTC so the computer's time zone can't shift a day.
+  const pad = n => String(n).padStart(2, '0');
+  const utc = iso => new Date(iso + 'T00:00:00Z');
+  const addDays = (iso, n) => { const d = utc(iso); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+  const mondayOf = iso => addDays(iso, -((utc(iso).getUTCDay() + 6) % 7));
+  const todayIso = () => { const d = new Date(); return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); };
+  const fmt = (iso, opts) => utc(iso).toLocaleDateString('en-GB', Object.assign({ timeZone: 'UTC' }, opts));
+  const weekLabel = monday => fmt(monday, { day: 'numeric', month: 'short' }) + ' – '
+    + fmt(addDays(monday, 6), { day: 'numeric', month: 'short', year: 'numeric' });
+  const plural = (n, word) => n + ' ' + word + (n === 1 ? '' : 's');
+  const mailLink = item => '<a href="https://mail.google.com/mail/u/0/#all/' + esc(item.threadId) + '" target="_blank">Open email</a>';
+
+  const R = {
+    loaded: false,
+    items: [],          // from getReceivingList, newest first; item.checked is set once it is checked
+    details: {},        // key -> {invoice, backorders, error} once the PDF is read
+    showChecked: false,
+    recent: null,       // from getRecentProblems
+    draft: null,        // the invoice open in the pop-up: {item, invoice, lines, filled, saving, err}
+    week: null,         // Monday of the week report on screen
+    report: null,
+  };
+  let uid = 0;
+  let reading = false;
+
+  // ---- invoice list -----------------------------------------------------
+
+  async function load() {
+    try {
+      const res = await call('getReceivingList');
+      R.items = res.items;
+      R.loaded = true;
+      R.error = '';
+    } catch (err) {
+      R.error = 'Could not load the invoices: ' + err.message;
+    }
+    renderList();
+    readAll();
+  }
+
+  // Read the PDFs four at a time so the cards fill in as they are ready.
+  async function readAll() {
+    if (reading) return;
+    reading = true;
+    const busy = {};
+    const worker = async () => {
+      for (;;) {
+        const item = R.items.find(i => !i.checked && !R.details[i.key] && !busy[i.key]);
+        if (!item) return;
+        busy[item.key] = true;
+        let d;
+        try { d = await call('readReceiving', item); }
+        catch (err) { d = { invoice: '', backorders: [], error: true }; }
+        R.details[item.key] = d;
+        renderList();
+        if (R.draft && R.draft.item.key === item.key && !R.draft.filled) { fillFromInvoice(d); renderDialog(); }
+      }
+    };
+    await Promise.all([worker(), worker(), worker(), worker()]);
+    reading = false;
+  }
+
+  function card(item) {
+    const d = R.details[item.key];
+    const c = item.checked;
+    const invoice = c ? c.invoice : (d && d.invoice) || item.invoiceGuess;
+    let tag;
+    if (c) tag = '<span class="rc-tag ok">✓ Checked ' + esc(c.when) + ' · '
+      + (c.lines.length ? plural(c.lines.length, 'problem') : 'nothing wrong') + '</span>';
+    else if (!d) tag = '<span class="rc-tag">Reading invoice…</span>';
+    else if (d.error) tag = '<span class="rc-tag warn">Could not read this PDF</span>';
+    else if (d.backorders.length) tag = '<span class="rc-tag warn">' + plural(d.backorders.length, 'line') + ' back-ordered</span>';
+    else tag = '<span class="rc-tag">Nothing back-ordered</span>';
+    return '<div class="rc-card' + (c ? ' done' : '') + '" role="button" tabindex="0" data-key="' + esc(item.key) + '">'
+      + '<div class="rc-who">' + esc(item.supplier) + ' · ' + esc(item.dateText) + '</div>'
+      + (invoice ? '<div class="rc-inv"><span>Invoice</span> ' + esc(invoice) + '</div>'
+          : '<div class="rc-inv none">Invoice number not found</div>')
+      + '<div class="rc-notes">' + tag + mailLink(item) + '</div>'
+      + '<span class="rc-arrow" aria-hidden="true">▶</span></div>';
+  }
+
+  function renderList() {
+    const todo = R.items.filter(i => !i.checked);
+    const done = R.items.filter(i => i.checked);
+    const msg = $('rcMsg');
+    msg.className = 'rc-msg' + (R.error ? ' err' : '');
+    if (R.error) msg.textContent = R.error;
+    else if (!R.loaded) msg.textContent = 'Looking for invoices in your email…';
+    else if (!R.items.length) msg.textContent = 'No invoices found in the last 3 weeks.';
+    else if (!todo.length) msg.textContent = 'Every invoice has been checked.';
+    else msg.innerHTML = '<b>' + plural(todo.length, 'invoice') + '</b> to check. When a delivery has been checked, tap its invoice.';
+    $('rcCards').innerHTML = todo.map(card).join('')
+      + (done.length ? '<div class="rc-more"><button class="link" data-toggle="1">'
+          + (R.showChecked ? 'Hide' : 'Show') + ' ' + done.length + ' checked</button></div>' : '')
+      + (R.showChecked ? done.map(card).join('') : '');
+  }
+
+  $('rcCards').addEventListener('click', e => {
+    if (e.target.closest('a')) return;
+    if (e.target.closest('[data-toggle]')) { R.showChecked = !R.showChecked; renderList(); return; }
+    const c = e.target.closest('.rc-card');
+    if (c) openDraft(c.dataset.key);
+  });
+  $('rcCards').addEventListener('keydown', e => {
+    if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('.rc-card')) {
+      e.preventDefault();
+      openDraft(e.target.dataset.key);
+    }
+  });
+
+  // ---- pop-up -----------------------------------------------------------
+
+  const dlg = $('rcDialog');
+
+  function openDraft(key) {
+    const item = R.items.find(i => i.key === key);
+    if (!item) return;
+    const d = R.details[key];
+    const c = item.checked;
+    $('rcNote').textContent = '';
+    R.draft = {
+      item,
+      invoice: c ? c.invoice : (d && d.invoice) || item.invoiceGuess || '',
+      lines: c ? c.lines.map(l => newLine(l.problem, l)) : [],
+      filled: !!c,
+      saving: false,
+      err: '',
+    };
+    if (!c && d) fillFromInvoice(d);
+    renderDialog();
+    dlg.showModal();
+    // Read it now if the list has not got to it yet.
+    if (!c && !d) readAll();
+  }
+
+  // A line in the pop-up. Back orders keep the description read from the invoice.
+  function newLine(problem, from) {
+    from = from || {};
+    return { uid: ++uid, problem, part: from.part || '', desc: from.desc || '', qty: from.qty || 1,
+             fixed: problem === 'Back order' && !!from.part };
+  }
+
+  function fillFromInvoice(d) {
+    const D = R.draft;
+    D.lines = d.backorders.map(b => newLine('Back order', b)).concat(D.lines);
+    if (!D.typedInvoice && d.invoice) D.invoice = d.invoice;
+    D.filled = true;
+  }
+
+  function renderDialog() {
+    const D = R.draft;
+    if (!D) return;
+    const d = R.details[D.item.key];
+    const section = key => {
+      const p = PROBLEMS[key];
+      const rows = D.lines.filter(l => l.problem === key);
+      let empty = '';
+      if (key === 'Back order' && !D.filled) empty = '<p class="rc-hint">Reading the invoice…</p>';
+      else if (key === 'Back order' && d && d.error && !rows.length) empty = '<p class="rc-hint">Could not read this PDF. Open the email to check for back orders.</p>';
+      else if (key === 'Back order' && !rows.length) empty = '<p class="rc-hint">Nothing back-ordered on this invoice.</p>';
+      return '<section class="rc-sec"><h3>' + p.title + '<span>' + p.hint + '</span></h3>'
+        + (rows.map(row).join('') || empty)
+        + '<button class="link rc-add" data-add="' + key + '">' + p.add + '</button></section>';
+    };
+    const problems = D.lines.filter(l => l.part.trim() || l.fixed).length;
+    dlg.innerHTML = '<div class="rc-dbody">'
+      + '<div class="rc-dhead"><div class="grow">'
+      + '<div class="lbl" id="rcDlgLabel">Check delivery</div>'
+      + '<div class="rc-invrow"><label for="rcInv">Invoice</label>'
+      + '<input type="text" id="rcInv" autocomplete="off" value="' + esc(D.invoice) + '"></div>'
+      + '<p class="rc-dsub">' + esc(D.item.supplier) + ' · ' + esc(D.item.dateText) + ' · ' + mailLink(D.item) + '</p>'
+      + '</div><button class="rc-x" data-close="1" aria-label="Close">✗</button></div>'
+      + ASK_ORDER.map(section).join('')
+      + '</div>'
+      + '<div class="rc-dfoot">'
+      + (D.err ? '<div class="err" role="alert">' + esc(D.err) + '</div>' : '')
+      + '<span class="sum">' + (problems ? plural(problems, 'problem') + ' to save' : 'Nothing wrong with this delivery') + '</span>'
+      + (D.item.checked ? '<button class="link danger" data-uncheck="1">Mark as not checked</button>' : '')
+      + '<button class="link" data-close="1">Cancel</button>'
+      + '<button class="btn primary" data-save="1"' + (D.saving || !D.filled ? ' disabled' : '') + '>'
+      + (D.saving ? 'Saving…' : !D.filled ? 'Reading the invoice…' : 'Save — invoice checked') + '</button>'
+      + '</div>';
+  }
+
+  function row(l) {
+    const part = l.fixed
+      ? '<div class="rc-part"><b>' + esc(l.part) + '</b>' + (l.desc ? '<span>' + esc(l.desc) + '</span>' : '') + '</div>'
+      : '<input type="text" class="rc-partin" data-part="' + l.uid + '" autocomplete="off" placeholder="Part number"'
+        + ' aria-label="' + PROBLEMS[l.problem].title + ' part number" value="' + esc(l.part) + '">';
+    return '<div class="rc-row">' + part
+      + '<div class="rc-stepper"><button data-step="-1" data-uid="' + l.uid + '" aria-label="One fewer"' + (l.qty <= 1 ? ' disabled' : '') + '>−</button>'
+      + '<span class="n" aria-live="polite">' + l.qty + '</span>'
+      + '<button data-step="1" data-uid="' + l.uid + '" aria-label="One more"' + (l.qty >= MAX ? ' disabled' : '') + '>+</button></div>'
+      + '<button class="rc-rm" data-rm="' + l.uid + '">✗ Remove</button></div>';
+  }
+
+  dlg.addEventListener('input', e => {
+    const D = R.draft;
+    if (!D) return;
+    if (e.target.id === 'rcInv') { D.invoice = e.target.value; D.typedInvoice = true; return; }
+    if (e.target.dataset.part) {
+      const l = D.lines.find(x => x.uid === Number(e.target.dataset.part));
+      if (l) l.part = e.target.value;
+      const n = D.lines.filter(x => x.part.trim() || x.fixed).length;
+      dlg.querySelector('.rc-dfoot .sum').textContent = n ? plural(n, 'problem') + ' to save' : 'Nothing wrong with this delivery';
+    }
+  });
+  // Enter in a part box adds nothing by accident; it just moves on.
+  dlg.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.matches('input')) e.preventDefault(); });
+
+  dlg.addEventListener('click', async e => {
+    const D = R.draft;
+    const b = e.target.closest('button');
+    if (!D || !b) return;
+    if (b.dataset.close) { dlg.close(); return; }
+    if (b.dataset.add) {
+      const l = newLine(b.dataset.add);
+      D.lines.push(l);
+      renderDialog();
+      dlg.querySelector('[data-part="' + l.uid + '"]').focus();
+      return;
+    }
+    if (b.dataset.rm) {
+      D.lines = D.lines.filter(l => l.uid !== Number(b.dataset.rm));
+      renderDialog();
+      return;
+    }
+    if (b.dataset.step) {
+      const l = D.lines.find(x => x.uid === Number(b.dataset.uid));
+      l.qty = Math.max(1, Math.min(MAX, l.qty + Number(b.dataset.step)));
+      const box = b.closest('.rc-stepper');
+      box.querySelector('.n').textContent = l.qty;
+      box.querySelector('[data-step="-1"]').disabled = l.qty <= 1;
+      box.querySelector('[data-step="1"]').disabled = l.qty >= MAX;
+      return;
+    }
+    if (b.dataset.save) { save(); return; }
+    if (b.dataset.uncheck) uncheck();
+  });
+
+  dlg.addEventListener('close', () => { R.draft = null; });
+
+  async function save() {
+    const D = R.draft;
+    if (!D.invoice.trim()) { D.err = 'Type the invoice number first.'; renderDialog(); $('rcInv').focus(); return; }
+    // Empty rows that were added and never filled in are left out.
+    const lines = D.lines.filter(l => l.part.trim() || l.fixed)
+      .map(l => ({ part: l.part.trim(), desc: l.desc, problem: l.problem, qty: l.qty }));
+    D.saving = true; D.err = '';
+    renderDialog();
+    try {
+      const res = await call('saveReceiving', D.item, D.invoice, lines);
+      D.item.checked = res.checked;
+      R.recent = res.recent;
+      $('rcNote').textContent = '✓ Invoice ' + res.checked.invoice + ' saved as checked'
+        + (lines.length ? ', with ' + plural(lines.length, 'problem') + '.' : '. Nothing wrong.');
+      dlg.close();
+      renderList();
+      renderRecent();
+    } catch (err) {
+      if (R.draft !== D) return;
+      D.saving = false;
+      D.err = 'Could not save: ' + err.message;
+      renderDialog();
+    }
+  }
+
+  async function uncheck() {
+    const D = R.draft;
+    if (!confirm('Mark invoice ' + D.item.checked.invoice + ' as not checked?\n\nWhat was saved for it is removed and it goes back in the list to check.')) return;
+    try {
+      const res = await call('uncheckReceiving', D.item);
+      D.item.checked = null;
+      R.recent = res.recent;
+      $('rcNote').textContent = '✓ Invoice ' + D.invoice.trim().toUpperCase() + ' is back in the list to check.';
+      dlg.close();
+      renderList();
+      renderRecent();
+      readAll();
+    } catch (err) {
+      D.err = 'Could not do that: ' + err.message;
+      renderDialog();
+    }
+  }
+
+  // ---- right column: the last 7 days --------------------------------------
+
+  async function loadRecent() {
+    try { R.recent = await call('getRecentProblems'); R.recentError = ''; }
+    catch (err) { R.recentError = 'Could not load: ' + err.message; }
+    renderRecent();
+  }
+
+  function status(l) {
+    if (l.problem === 'Back order') {
+      return l.sorted ? '<span class="ok">✓ ' + esc(l.note || 'Arrived ' + l.sorted) + '</span>'
+        : '<span class="warn">Waiting for the next delivery</span>';
+    }
+    return l.sorted ? '<span class="ok">✓ Sorted ' + esc(l.sorted) + '</span>' : '';
+  }
+
+  function renderRecent() {
+    const box = $('rcRecent');
+    if (R.recentError) { box.innerHTML = '<p class="rc-msg err">' + esc(R.recentError) + '</p>'; return; }
+    if (!R.recent) { box.innerHTML = '<p class="rc-hint">Loading…</p>'; return; }
+    if (!R.recent.length) { box.innerHTML = '<p class="rc-hint" style="margin-top:16px">No problems in the last 7 days.</p>'; return; }
+    box.innerHTML = SHOW_ORDER.map(key => {
+      const lines = R.recent.filter(l => l.problem === key);
+      if (!lines.length) return '';
+      const open = lines.filter(l => !l.sorted).length;
+      return '<h3><span class="lbl">' + PROBLEMS[key].title + '</span><span class="n">'
+        + (open ? open + ' not sorted' : 'all sorted') + '</span></h3>'
+        + lines.map(l => '<div class="rc-pl' + (l.sorted ? ' done' : '') + '">'
+          + '<div class="what"><b>' + esc(l.part) + '</b> <em>× ' + l.qty + '</em>'
+          + '<span>Invoice ' + esc(l.invoice) + ' · checked ' + esc(l.when) + '</span>' + status(l) + '</div>'
+          + (key === 'Back order' ? '' : '<label class="rc-check"><input type="checkbox" data-sorted="' + esc(l.id) + '"'
+              + (l.sorted ? ' checked' : '') + '>Sorted</label>')
+          + '</div>').join('');
+    }).join('');
+  }
+
+  $('rcRecent').addEventListener('change', async e => {
+    const box = e.target;
+    if (!box.dataset.sorted) return;
+    box.disabled = true;
+    try { R.recent = await call('setSorted', box.dataset.sorted, box.checked); }
+    catch (err) { alert('Could not save that: ' + err.message); }
+    renderRecent();
+  });
+
+  // ---- week report --------------------------------------------------------
+
+  function showReport(on) {
+    $('rcMain').hidden = on;
+    $('rcReport').hidden = !on;
+  }
+
+  async function loadReport(monday) {
+    R.week = monday;
+    R.report = null;
+    renderReport();
+    try {
+      const rep = await call('getWeekReport', monday);
+      if (R.week === monday) { R.report = rep; renderReport(); }
+    } catch (err) {
+      $('rcReportBody').innerHTML = '<p class="rc-msg err">Could not load the report: ' + esc(err.message) + '</p>';
+    }
+  }
+
+  function renderReport() {
+    $('rcWeekLabel').textContent = weekLabel(R.week);
+    $('rcNext').disabled = R.week >= mondayOf(todayIso());
+    const rep = R.report;
+    if (!rep) { $('rcReportBody').innerHTML = '<p class="rc-hint">Loading…</p>'; return; }
+    const all = rep.groups.reduce((n, g) => n + g.lines.length, 0);
+    const open = rep.groups.reduce((n, g) => n + g.open, 0);
+    const counts = rep.groups.filter(g => g.lines.length).map(g => g.lines.length + ' ' + PROBLEMS[g.problem].many);
+    $('rcReportBody').innerHTML = '<p class="rc-total"><b>Week of ' + esc(weekLabel(rep.monday)) + '.</b> '
+      + (all ? plural(all, 'problem') + ': ' + counts.join(', ') + '. '
+          + (open ? '<b>' + open + ' not sorted yet.</b>' : 'All sorted.')
+        : 'No problems were found in deliveries checked this week.') + '</p>'
+      + rep.groups.filter(g => g.lines.length).map(g => '<h3><span class="lbl">' + PROBLEMS[g.problem].title + '</span>'
+        + '<span class="n">' + plural(g.lines.length, 'line') + ', ' + g.qty + ' in all</span></h3>'
+        + '<div class="rc-tablewrap"><table class="rc-table"><thead><tr><th>Part</th><th>Qty</th><th>Invoice</th>'
+        + '<th>Checked</th><th>Status</th></tr></thead><tbody>'
+        + g.lines.map(l => '<tr><td class="part">' + esc(l.part) + (l.desc ? '<span>' + esc(l.desc) + '</span>' : '') + '</td>'
+          + '<td>' + l.qty + '</td><td>' + esc(l.invoice) + '</td><td>' + esc(l.when) + '</td>'
+          + '<td>' + (l.problem === 'Back order'
+              ? (l.sorted ? '<span class="ok">' + esc(l.note || 'Arrived') + '</span>' : '<span class="warn">Still waiting</span>')
+              : (l.sorted ? '<span class="ok">Sorted ' + esc(l.sorted) + '</span>' : '<span class="warn">Not sorted</span>'))
+          + '</td></tr>').join('')
+        + '</tbody></table></div>').join('');
+  }
+
+  $('rcReportBtn').addEventListener('click', () => { showReport(true); loadReport(mondayOf(todayIso())); });
+  $('rcReportBack').addEventListener('click', () => { showReport(false); loadRecent(); });
+  $('rcPrev').addEventListener('click', () => loadReport(addDays(R.week, -7)));
+  $('rcNext').addEventListener('click', () => loadReport(addDays(R.week, 7)));
+  $('rcPrint').addEventListener('click', () => window.print());
+
+  return {
+    // Called each time the section is shown: fetch new invoices and the latest problems.
+    open() {
+      if (!$('rcReport').hidden) return;
+      load();
+      loadRecent();
+    },
+  };
+})();
+</script>

@@ -97,6 +97,7 @@
     <div class="brand">PureTech</div>
     <nav class="sections" aria-label="Sections">
       <button data-section="returns">Returns</button>
+      <button data-section="receiving">Receiving</button>
       <button data-section="scheduling">Scheduling</button>
     </nav>
     <nav class="links" aria-label="Spreadsheet"><a id="sheetLink" target="_blank" href="#">Open spreadsheet</a><a id="excelLink" href="#">Download Excel</a></nav>
@@ -105,6 +106,8 @@
 
 <?!= include_('ReturnsPage') ?>
 
+<?!= include_('ReceivingPage') ?>
+
 <?!= include_('SchedulePage') ?>
 
 <script>
@@ -112,19 +115,21 @@
 
   function showSection(name) {
     $('returnsSection').hidden = name !== 'returns';
+    $('receivingSection').hidden = name !== 'receiving';
     $('schedulingSection').hidden = name !== 'scheduling';
     document.querySelectorAll('.appbar .sections button').forEach(b => {
       b.classList.toggle('on', b.dataset.section === name);
       if (b.dataset.section === name) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current');
     });
     if (name === 'scheduling') Scheduling.open();
+    else if (name === 'receiving') Receiving.open();
     else $('part').focus();
   }
   document.querySelector('.appbar .sections').addEventListener('click', e => {
     const b = e.target.closest('button');
     if (b) showSection(b.dataset.section);
   });
-  showSection(document.body.dataset.section === 'scheduling' ? 'scheduling' : 'returns');
+  showSection(['receiving', 'scheduling'].includes(document.body.dataset.section) ? document.body.dataset.section : 'returns');
 </script>
 </body>
 </html>

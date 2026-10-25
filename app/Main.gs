@@ -1,13 +1,16 @@
 /**
  * PureTech
  *
- * One web app and one Google Sheet for the shop, with two sections:
+ * One web app and one Google Sheet for the shop, with three sections:
  *  - Returns (Returns.gs, ReturnsPage.html): find supplier invoices in Gmail and log part returns.
+ *  - Receiving (Receiving.gs, ReceivingPage.html): check deliveries against their invoices and log
+ *    back-ordered, missing and extra parts.
  *  - Scheduling (Schedule.gs, SchedulePage.html): the weekly staff calendar.
- * This file holds the page, the one-time setup and the helpers both sections use.
+ * This file holds the page, the one-time setup and the helpers the sections share.
  */
 
 const APP_NAME = 'PureTech';
+const SECTIONS = ['returns', 'receiving', 'scheduling'];
 
 // ---------------------------------------------------------------------------
 // Web app
@@ -16,10 +19,12 @@ function doGet(e) {
   // First time the page is opened (or after an upgrade): create the missing tabs.
   // The "By Pallet" check also moves returns saved before pallets onto Pallet 1.
   const ss = ss_();
-  if (!ss.getSheetByName(RETURNS) || !ss.getSheetByName(BY_PALLET) || !ss.getSheetByName(SCHED_STAFF)) setup();
+  if (!ss.getSheetByName(RETURNS) || !ss.getSheetByName(BY_PALLET) || !ss.getSheetByName(SCHED_STAFF)
+      || !ss.getSheetByName(RECEIVING)) setup();
   const page = HtmlService.createTemplateFromFile('Index');
-  // ?section=scheduling opens the Scheduling section straight away.
-  page.section = e && e.parameter && e.parameter.section === 'scheduling' ? 'scheduling' : 'returns';
+  // ?section=scheduling or ?section=receiving opens that section straight away.
+  const asked = e && e.parameter && e.parameter.section;
+  page.section = SECTIONS.indexOf(asked) !== -1 ? asked : 'returns';
   return page.evaluate()
     .setTitle(APP_NAME)
     .addMetaTag('viewport', 'width=device-width, initial-scale=1');
@@ -49,6 +54,7 @@ function setup() {
 
   setupReturns_(ss);
   setupSchedule_(ss);
+  setupReceiving_(ss);
 
   // Remove the default empty "Sheet1" if it is still there.
   const blank = ss.getSheetByName('Sheet1');

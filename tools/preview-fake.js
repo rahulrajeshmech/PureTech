@@ -1,10 +1,10 @@
 // PureTech preview: stands in for Google so the page runs from a local file.
 // tools/preview.mjs pastes this into the preview page, with the real .gs code
-// in place of SERVER_CODE. Schedule and saving/undo use the real server code
-// on pretend sheets; Gmail and the PDFs are replaced by a few demo invoices.
+// in place of SERVER_CODE. Schedule, Receiving and saving/undo use the real server
+// code on pretend sheets; Gmail and the PDFs are replaced by a few demo invoices.
 // Changes are kept in this browser until "Reset demo data" is pressed.
 (function () {
-  const STORE = 'puretech-preview-v2';
+  const STORE = 'puretech-preview-v3';
   const pad = n => String(n).padStart(2, '0');
   const iso = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
   const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -16,6 +16,7 @@
     monday.setDate(today.getDate() - ((today.getDay() + 6) % 7));
     const day = n => { const d = new Date(monday); d.setDate(monday.getDate() + n); return iso(d); };
     const week = s => [...'MTWTFSS'].map((x, i) => s.includes(i));
+    const ago = (days, hour) => { const d = new Date(today); d.setDate(d.getDate() - days); d.setHours(hour || 9, 0, 0, 0); return d; };
     const people = [
       ['Ana', 'Full time', [0, 1, 2, 3, 4]], ['Ben', 'Full time', [0, 1, 2, 3, 4, 5]], ['Chloe', 'Full time', [1, 2, 3, 4, 5]],
       ['Priya', 'Part time', [1, 2, 5]], ['Dev', 'Part time', [0, 3, 4]],
@@ -27,6 +28,15 @@
       'By Invoice': [[]],
       '_pallets': [['Pallet', 'Started', 'Finished'], [1, today, '']],
       '_pdf_cache': [['Key', 'Invoice', 'Text']],
+      // Invoice 31CX7001 was checked 4 days ago: two back orders and a missing part.
+      // One from 10 days ago, already sorted, so the week report has an earlier week.
+      'Receiving': [['Date Checked', 'Invoice Number', 'Invoice Date', 'Part Number', 'Description', 'Problem', 'Quantity', 'Sorted', 'Note', 'Email', 'Key'],
+        [ago(4), '31CX7001', ago(5), 'CH8115', 'OIL FILTER', 'Back order', 2, '', '', 'Open', 'r1:0'],
+        [ago(4), '31CX7001', ago(5), '171577', 'STRUT ASSEMBLY', 'Back order', 1, '', '', 'Open', 'r1:0'],
+        [ago(4), '31CX7001', ago(5), 'BP-4471', '', 'Missing', 1, '', '', 'Open', 'r1:0'],
+        [ago(10), '31CX6890', ago(11), 'WA-120', '', 'Missing', 2, ago(8), '', 'Open', 'r0:0']],
+      'Receiving · Week': [[]],
+      '_received': [['Key', 'Invoice', 'Checked', 'Problems'], ['r1:0', '31CX7001', ago(4), 3], ['r0:0', '31CX6890', ago(10), 1]],
       'Schedule · Staff': [['Name', 'Type', 'Active']].concat(people.map(p => [p[0], p[1], true])),
       'Schedule · Base Week': [['Name', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']].concat(people.map(p => [p[0]].concat(week(p[2])))),
       'Schedule · Needed': [['Type', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
@@ -49,6 +59,22 @@
       text: 'METRO TRADE SPARES\nBill No: B55310\nBP 4471 Brake pad set 2 @ 84.00\nSP-9 Spark plug 8 @ 7.20' },
     { id: 'm4', from: '"Northside Parts Co" <invoices@northside.example>', subject: 'Tax Invoice INV-199870', file: 'INV-199870.pdf', daysAgo: 40,
       text: 'NORTHSIDE PARTS CO\nTax Invoice No: INV-199870\nCH-8115 Oil filter 6 @ 12.50\nAF-301 Air filter 1 @ 24.00' },
+  ];
+
+  // Receiving: Vast-Auto invoices, laid out like the real ones (UNIT, ORDERED, SHIPPED, B/O, prices).
+  const VAST = '"Vast-Auto Distribution" <csvado@vastauto.example>';
+  const vastText = (no, lines) => 'VAST-AUTO DISTRIBUTION\nINVOICE\nNo. ' + no + '\nUNIT ORDERED SHIPPED B/O PRICE NET NET EXT\n'
+    + 'PRICE CORE PRICE ITEM DESCRIPTION\n' + lines.join('\n') + '\n*** Page 1 of 1 ***';
+  const RECEIVING_EMAILS = [
+    { id: 'r4', from: VAST, subject: 'Invoice 31CX7051', file: '31CX7051.pdf', daysAgo: 0,
+      text: vastText('31CX7051', ['ACD 41-110 SPARK PLUG EA 4 4 0 9.80 6.10 0.00 24.40', 'MON 171577 STRUT ASSEMBLY EA 1 1 0 210.00 141.20 0.00 141.20']) },
+    { id: 'r3', from: VAST, subject: 'Invoice 31CX7044', file: '31CX7044.pdf', daysAgo: 1,
+      text: vastText('31CX7044', ['FRA CH8115 OIL FILTER EA 2 2 0 14.20 9.10 0.00 18.20', 'DOR 924-301 BRAKE LINE EA 1 1 0 22.40 15.30 0.00 15.30',
+        'SPI F44B FUEL TANK EA 2 1 1 420.28 271.84 0.00 271.84']) },
+    { id: 'r2', from: VAST, subject: 'Invoice 31CX7020', file: '31CX7020.pdf', daysAgo: 3,
+      text: vastText('31CX7020', ['WIX 51515 OIL FILTER EA 10 10 0 8.10 5.20 0.00 52.00', 'BOS 0242 SPARK PLUG EA 8 6 2 7.20 4.90 0.00 29.40']) },
+    { id: 'r1', from: VAST, subject: 'Invoice 31CX7001', file: '31CX7001.pdf', daysAgo: 5,
+      text: vastText('31CX7001', ['FRA CH8115 OIL FILTER EA 6 4 2 14.20 9.10 0.00 36.40', 'MON 171577 STRUT ASSEMBLY EA 2 1 1 210.00 141.20 0.00 141.20']) },
   ];
 
   // ---- pretend spreadsheet ---------------------------------------------------
@@ -154,8 +180,15 @@
         supplier: supplierName_(m.from), subject: m.subject, dateIso: date.toISOString(),
         dateText: Utilities.formatDate(date, '', 'd MMM yyyy') };
     }
+    // Receiving reads Gmail and the PDFs through these two; the rest is the real code.
+    receivingEmails_ = () => RECEIVING_EMAILS.map(m => Object.assign(demoItem(m), { invoiceGuess: guessInvoice_('', m.subject, m.file) }));
+    receivingText_ = item => {
+      const m = RECEIVING_EMAILS.find(x => x.id === item.messageId);
+      return { text: m.text, invoice: guessInvoice_(m.text, item.subject, item.fileName) };
+    };
     return {
-      getConfig, recordReturn, undoReturn, getPallets, getPallet, newPallet, reopenPallet, moveToPallet, deleteReturn, getWeek, setDayOff, addExtra, removeChange, saveMasterSchedule,
+      getConfig, getReceivingList, readReceiving, saveReceiving, uncheckReceiving, getRecentProblems, setSorted, getWeekReport,
+      recordReturn, undoReturn, getPallets, getPallet, newPallet, reopenPallet, moveToPallet, deleteReturn, getWeek, setDayOff, addExtra, removeChange, saveMasterSchedule,
       searchPart(part) {
         part = String(part || '').trim();
         const out = { items: [], returned: [], returnedInvoices: [], show: SHOW_INVOICES };
@@ -195,7 +228,7 @@
           } catch (e) { if (fail) fail(e); return; }
           save();
           if (ok) ok(res);
-        }, k === 'readInvoice' ? 500 : 150);
+        }, k === 'readInvoice' || k === 'readReceiving' ? 500 : 150);
       },
     });
   }

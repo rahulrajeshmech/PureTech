@@ -1,14 +1,16 @@
 # PureTech
 
-One Google web app and one Google Sheet for the shop, with two sections:
+One Google web app and one Google Sheet for the shop, with three sections:
 
 - **[Returns](returns/README.md)**: find which supplier invoice a part was bought on and log the return.
+- **[Receiving](receiving/README.md)**: check each delivery against its invoice and keep a list of
+  back-ordered, missing and extra parts, with a weekly report.
 - **[Scheduling](scheduling/README.md)**: the weekly staff calendar, with a check that enough people are in each day.
 
 The buttons at the top of the page switch between them. The app opens on **Returns**.
 
-**Live demo:** <https://claude.ai/artifact/UH6Por2eFhb5ntu2B4ZMSu> (add `#scheduling` to the end to open on
-Scheduling). It runs on demo data with made-up suppliers and a sample team. The link is private:
+**Live demo:** <https://claude.ai/artifact/UH6Por2eFhb5ntu2B4ZMSu> (add `#receiving` or `#scheduling` to
+the end to open on that section). It runs on demo data with made-up suppliers and a sample team. The link is private:
 ask the owner to share it with you if it does not open.
 
 It runs inside your own Google account: no server, no cost, and your email never leaves Google.
@@ -17,8 +19,9 @@ It runs inside your own Google account: no server, no cost, and your email never
 
 ```
 puretech/
-├─ app/          the PureTech page and setup, shared by both sections
+├─ app/          the PureTech page and setup, shared by all sections
 ├─ returns/      the Returns section
+├─ receiving/    the Receiving section
 ├─ scheduling/   the Scheduling section
 ├─ docs/         the architecture diagram
 └─ tools/        the local preview and demo builder
@@ -36,6 +39,8 @@ without the ending:
 | `appsscript.json` | Manifest | [`app/appsscript.json`](app/appsscript.json) |
 | `Returns` | Script | [`returns/Returns.gs`](returns/Returns.gs) |
 | `ReturnsPage` | HTML | [`returns/ReturnsPage.html`](returns/ReturnsPage.html) |
+| `Receiving` | Script | [`receiving/Receiving.gs`](receiving/Receiving.gs) |
+| `ReceivingPage` | HTML | [`receiving/ReceivingPage.html`](receiving/ReceivingPage.html) |
 | `Schedule` | Script | [`scheduling/Schedule.gs`](scheduling/Schedule.gs) |
 | `SchedulePage` | HTML | [`scheduling/SchedulePage.html`](scheduling/SchedulePage.html) |
 
@@ -48,9 +53,9 @@ For a version you can zoom and click, download
 
 ## The spreadsheet
 
-The sheet is called **PureTech**. Its tabs are coloured by section: green for Returns, blue for Scheduling.
-The tabs are described in each section's guide: [Returns](returns/README.md#spreadsheet-tabs) and
-[Scheduling](scheduling/README.md#spreadsheet-tabs).
+The sheet is called **PureTech**. Its tabs are coloured by section: green for Returns, amber for Receiving,
+blue for Scheduling. The tabs are described in each section's guide: [Returns](returns/README.md#spreadsheet-tabs),
+[Receiving](receiving/README.md#spreadsheet-tabs) and [Scheduling](scheduling/README.md#spreadsheet-tabs).
 
 **Download Excel**: link at the top of the tool, or in the sheet use File → Download → Microsoft Excel.
 
@@ -68,10 +73,10 @@ Do this signed in to the Google account that **receives the supplier invoices**.
      delete what's in it, and paste in `returns/Returns.gs`.
    - Open `appsscript.json`, delete what's there, and paste in `app/appsscript.json`.
    - Click **+ → Script**, name it `Main` (no `.gs`), and paste in `app/Main.gs`.
-     Do the same for `Schedule` with `scheduling/Schedule.gs`.
+     Do the same for `Schedule` with `scheduling/Schedule.gs` and `Receiving` with `receiving/Receiving.gs`.
    - Click **+ → HTML**, name it `Index` (no `.html`), delete what's there, and paste in `app/Index.html`.
-     Do the same for `ReturnsPage` with `returns/ReturnsPage.html` and `SchedulePage` with
-     `scheduling/SchedulePage.html`.
+     Do the same for `ReturnsPage` with `returns/ReturnsPage.html`, `ReceivingPage` with
+     `receiving/ReceivingPage.html` and `SchedulePage` with `scheduling/SchedulePage.html`.
    - Click **Save** (disk icon).
 5. Click **Deploy → New deployment** → gear → **Web app**:
    - Execute as: **Me**
@@ -81,11 +86,12 @@ Do this signed in to the Google account that **receives the supplier invoices**.
      yourself; it only runs in your account.
    - Copy the **Web app URL**.
 6. Open that URL. The first time, Google may ask for permission again (same steps as above).
-   The tool then creates the Returns and Schedule tabs in your sheet by itself.
+   The tool then creates the Returns, Receiving and Schedule tabs in your sheet by itself.
 7. On the shop PC, open Chrome **signed in to that same Google account**, open the URL, and
    create a desktop shortcut (Chrome menu ⋮ → **Cast, save and share → Create shortcut**, name it **PureTech**).
 8. Optional: for a shortcut that opens straight on Scheduling, add `?section=scheduling` to the end of
-   the Web app URL, open that, and create a second shortcut named **Staff schedule**.
+   the Web app URL, open that, and create a second shortcut named **Staff schedule**. For Receiving, use
+   `?section=receiving`.
 9. Open **Scheduling → Make changes → Master scheduling** to add the team.
 
 ### Upgrading from the old returns tool (Pure-Merch-Return)
@@ -134,12 +140,12 @@ To see the page and try changes before copying anything into Google:
 
 1. In the project folder run `node tools/preview.mjs --open`. It builds
    `preview/PureTech-preview.html` and opens it in the browser.
-2. It uses demo data: a sample team for Scheduling, and demo invoices for Returns (try part
-   numbers `CH8115` or `BP4471`). Nothing reaches Gmail or the Google Sheet.
+2. It uses demo data: a sample team for Scheduling, demo invoices for Returns (try part
+   numbers `CH8115` or `BP4471`), and four Vast-Auto invoices for Receiving. Nothing reaches Gmail or the Google Sheet.
 3. What you do in the preview is remembered in that browser. **Reset demo data** (top right) starts again.
-4. After changing any file in `app/`, `returns/` or `scheduling/`, run step 1 again and reload the page.
+4. After changing any file in `app/`, `returns/`, `receiving/` or `scheduling/`, run step 1 again and reload the page.
 
 The same demo can be published as a web page to look at from any device:
 `node tools/preview.mjs --artifact` builds `preview/PureTech-demo.html` for that. On the published page,
-add `#scheduling` to the end of the link to open on Scheduling. Confirmation questions (Undo, Remove) are
+add `#receiving` or `#scheduling` to the end of the link to open on that section. Confirmation questions (Undo, Remove) are
 answered "yes" automatically there, because published pages cannot show them.
