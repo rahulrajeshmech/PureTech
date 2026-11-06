@@ -6,7 +6,8 @@ Find which supplier invoice a part was bought on, and log the return.
 
 1. Type a part number.
 2. It finds every invoice PDF in your Gmail that contains that part (any supplier, any layout).
-3. Tap one invoice, choose **how many** you are returning with the **−** and **+** buttons, type a
+3. Tap one invoice, choose **how many** you are returning with the **−** and **+** buttons, pick the
+   **category** (**Defect**, **Core** or **New Return**; Defect is chosen to start with), type a
    **comment** if you want to (for example "box damaged"), and press **Return**.
 4. It shows the invoice number to write on the part and the **pallet** to put it on, and saves the
    return to the Google Sheet (downloadable as Excel).
@@ -23,9 +24,9 @@ e.g. **Pallet 3 · 12 parts · started 14 Oct**.
   (It is greyed out while the current pallet is empty.)
 - **See pallets**: every pallet, newest first; the one new returns go on has a dark outline. Tap one to see
   what is on it, and **◀ All pallets** to go back to the list.
-  - **Add comment** / **Edit comment** next to a part adds or changes its comment. To remove a comment,
-    clear the box and press **Save**.
-  - **Move to pallet…** next to a part moves it to another pallet.
+  - **Modify** next to a part opens three choices: move it to another pallet, change its category, or
+    change its comment (type, then **Save comment**; clear the box and save to remove it).
+    Core and New Return show as a coloured tag next to the part; Defect has no tag.
   - **Delete** next to a part removes that return from the spreadsheet, the same as undo. The invoice is
     free to use again; cross out the invoice number if it was already written on the part.
   - **Add more to this pallet** on an earlier pallet makes new returns go on it again. The pallet that
@@ -42,12 +43,12 @@ e.g. **Pallet 3 · 12 parts · started 14 Oct**.
 ## Spreadsheet tabs
 
 - **Returns**: one row per return with date returned, pallet, part number, quantity, invoice number,
-  email date, PDF file name, a link to the email and the comment. Newest first, with filters.
-  The comment is the last column (J), after a hidden column.
+  category, email date, PDF file name, a link to the email and the comment. Newest first, with filters.
+  The comment is the last column (K), after a hidden column.
 - **By Pallet**: the returns sorted into pallets, newest pallet first: each pallet's dates and total,
-  then every part on it with its quantity, invoice number and comment.
+  then every part on it with its quantity, invoice number, category and comment.
 - **By Invoice**: grouped by invoice number, listing each part returned against it with its quantity,
-  pallet and comment.
+  pallet, category and comment.
 - **_pallets** (hidden): each pallet's number and the dates it was started and finished. Leave it alone;
   use the app to change pallets.
 - **_pdf_cache** (hidden): text read from each PDF, so it is only read once.

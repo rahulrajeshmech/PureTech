@@ -116,9 +116,20 @@
   .returns .cat-btns { display: flex; gap: 8px; flex-wrap: wrap; }
   .returns .cat-btns .btn { height: 44px; padding: 0 22px; font-size: 16px; }
 
+  /* Comment */
+  .returns .fix label span { font-weight: 400; color: var(--muted); }
+  .returns .fix input.note { text-transform: none; font-weight: 400; font-size: 20px; }
+  .returns .chosen .wide { flex-basis: 100%; }
+  .returns .done .note { font-size: 17px; overflow-wrap: anywhere; }
+  .returns .pline .what .cmt { color: var(--text); font-size: 16px; overflow-wrap: anywhere; }
+  .returns .pick-row input { flex: 1 1 240px; min-width: 0; height: 44px; padding: 0 12px; font-size: 17px;
+                             border: 1px solid var(--line-strong); border-radius: 10px; background: var(--card); }
+  .returns .pick-row input:focus { outline: none; border-color: var(--text); box-shadow: 0 0 0 1px var(--text); }
+
   /* Category tag on pallet lines */
   .returns .cat-tag { display: inline-flex; align-items: center; padding: 1px 8px; border-radius: 20px;
                       font-size: 13px; font-weight: 600; }
+  .returns .pline .what .cat-tag { display: inline-flex; }
   .returns .cat-tag.cat-core { background: #dbeafe; color: #1e40af; }
   .returns .cat-tag.cat-new-return { background: #fef9c3; color: #92400e; }
 </style>
@@ -150,6 +161,7 @@
     <div class="sub" id="doneSub"></div>
     <div class="pallet"><span id="donePut">Put it on</span><b id="donePallet"></b></div>
     <div class="sub" id="doneCat"></div>
+    <div class="note" id="doneComment" hidden></div>
     <button class="btn primary" id="next">Next part</button>
     <button class="link" id="undo">Undo — that was a mistake</button>
   </section>
@@ -174,11 +186,11 @@ const MAX_QTY = 999;
 
 // { part, search, loaded, items (not returned per Gmail key), returned, returnedInvoices, show,
 //   details: {key: {invoice, found, line, shipped}}, sel, typed, qty, shipped: {key: typed number},
-//   fixShipped, again: {key: true}, showReturned }
+//   fixShipped, again: {key: true}, showReturned, category, comment }
 let state = null;
 // From getPallets(), newest first: [{number, started, finished, open, qty}]
 let pallets = [];
-// The pallets screen: { show: pallet number or null for the list, lines, moving: id of the line being moved }
+// The pallets screen: { show: pallet number or null for the list, lines, modifying: id of the line being changed }
 let pv = null;
 
 $('form').addEventListener('submit', e => {
@@ -321,7 +333,10 @@ function card(item) {
         + '<div class="cat-pick"><label>Category</label><div class="cat-btns">'
         + ['Defect', 'Core', 'New Return'].map(c =>
             '<button class="btn' + (state.category === c ? ' primary' : '') + '" data-cat="' + esc(c) + '">' + esc(c) + '</button>').join('')
-        + '</div></div></div>' : '')
+        + '</div></div>'
+        + '<div class="fix wide"><label for="commentFix">Comment <span>(optional)</span></label>'
+        + '<input type="text" class="note" id="commentFix" maxlength="500" value="' + esc(state.comment || '') + '"></div>'
+        + '</div>' : '')
     + '</div>';
 }
 
@@ -374,7 +389,7 @@ function render() {
   }
   // Results re-render as PDFs finish reading; keep the cursor in the box being typed in.
   const active = document.activeElement;
-  const keep = active && (active.id === 'invoiceFix' || active.id === 'shippedFix')
+  const keep = active && ['invoiceFix', 'shippedFix', 'commentFix'].includes(active.id)
     ? { id: active.id, caret: active.selectionStart } : null;
 
   const list = available().sort((a, b) => rank(a) - rank(b) || b.dateIso.localeCompare(a.dateIso));
@@ -396,6 +411,8 @@ function render() {
   if (keep && $(keep.id)) { $(keep.id).focus(); $(keep.id).setSelectionRange(keep.caret, keep.caret); }
   const fix = $('invoiceFix');
   if (fix) fix.addEventListener('input', () => { state.typed = fix.value; updateButton(); });
+  const note = $('commentFix');
+  if (note) note.addEventListener('input', () => { state.comment = note.value; });
   const ship = $('shippedFix');
   if (ship) ship.addEventListener('input', () => {
     const n = parseInt(ship.value, 10);
@@ -464,7 +481,7 @@ $('results').addEventListener('keydown', e => {
 });
 
 function select(key) {
-  if (state.sel !== key) { state.sel = key; state.typed = undefined; state.qty = 1; state.category = 'Defect'; state.fixShipped = false; }
+  if (state.sel !== key) { state.sel = key; state.typed = undefined; state.qty = 1; state.category = 'Defect'; state.comment = ''; state.fixShipped = false; }
   render();
 }
 
@@ -475,13 +492,16 @@ $('returnBtn').addEventListener('click', async () => {
   $('returnBtn').disabled = true;
   $('returnBtn').textContent = 'Saving…';
   try {
-    const res = await call('recordReturn', item, state.part, invoice, state.qty, state.category);
+    const comment = (state.comment || '').trim();
+    const res = await call('recordReturn', item, state.part, invoice, state.qty, state.category, comment);
     state.last = { item, invoice: res.invoice };
     $('doneInvoice').textContent = res.invoice;
     $('doneSub').textContent = res.qty + ' × ' + state.part.toUpperCase() + ' · ' + item.supplier;
     $('donePut').textContent = 'Put ' + (res.qty > 1 ? 'them' : 'it') + ' on';
     $('donePallet').textContent = 'Pallet ' + res.pallet;
     $('doneCat').textContent = 'Category: ' + res.category;
+    $('doneComment').textContent = 'Comment: ' + comment;
+    $('doneComment').hidden = !comment;
     showView('done');
     $('next').focus();
     loadPallets();
@@ -598,7 +618,8 @@ function renderPallets() {
   const line = l => '<div class="pline">'
     + '<div class="what"><b>' + esc(l.part) + '</b> <em>× ' + l.qty + '</em>'
     + catTag(l.category || 'Defect')
-    + '<span>Invoice ' + esc(l.invoice) + ' · ' + esc(l.when) + '</span></div>'
+    + '<span>Invoice ' + esc(l.invoice) + ' · ' + esc(l.when) + '</span>'
+    + (l.comment ? '<span class="cmt">' + esc(l.comment) + '</span>' : '') + '</div>'
     + '<button class="btn" data-modify="' + esc(l.id) + '">Modify</button>'
     + '<button class="btn danger" data-delete="' + esc(l.id) + '">Delete</button>'
     + (pv.modifying === l.id ? '<div class="pick">'
@@ -612,6 +633,10 @@ function renderPallets() {
             '<button class="btn' + ((l.category || 'Defect') === c ? ' primary' : '') + '"'
             + ' data-setcat="' + esc(c) + '" data-id="' + esc(l.id) + '"'
             + ((l.category || 'Defect') === c ? ' disabled' : '') + '>' + esc(c) + '</button>').join('')
+        + '</div>'
+        + '<div class="pick-row"><label class="label" for="palletComment">Comment</label>'
+        + '<input type="text" id="palletComment" maxlength="500" value="' + esc(l.comment || '') + '">'
+        + '<button class="btn primary" data-savecomment="' + esc(l.id) + '">Save comment</button>'
         + '</div>'
         + '<button class="link" data-cancel="1">Cancel</button></div>' : '')
     + '</div>';
@@ -648,6 +673,7 @@ $('palletsBody').addEventListener('click', async e => {
     showPallet(pv.show);
     return;
   }
+  if (b.dataset.savecomment) { saveComment(b); return; }
   if (b.dataset.setcat) {
     b.disabled = true;
     try { setPallets(await call('setCategory', b.dataset.id, b.dataset.setcat)); }
@@ -677,6 +703,22 @@ $('palletsBody').addEventListener('click', async e => {
     catch (err) { alert('Could not do that: ' + err.message); }
   }
 });
+
+// Enter in the comment box saves it.
+$('palletsBody').addEventListener('keydown', e => {
+  if (e.target.id === 'palletComment' && e.key === 'Enter') {
+    e.preventDefault();
+    saveComment(document.querySelector('[data-savecomment]'));
+  }
+});
+
+async function saveComment(b) {
+  b.disabled = true;
+  try { await call('setComment', b.dataset.savecomment, $('palletComment').value); }
+  catch (err) { alert('Could not save the comment: ' + err.message); b.disabled = false; return; }
+  pv.modifying = null;
+  showPallet(pv.show);
+}
 
 loadPallets();
 </script>

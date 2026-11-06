@@ -23,9 +23,12 @@ const BY_PALLET = 'By Pallet';
 const BY_INVOICE = 'By Invoice';
 const PALLETS = '_pallets';
 const CACHE = '_pdf_cache';
+// Comment was added last, after the hidden Key column, so the other columns don't move.
 const RETURN_HEADERS = ['Date Returned', 'Pallet', 'Part Number', 'Quantity', 'Invoice Number',
-  'Category', 'Email Date', 'PDF File', 'Email', 'Key'];
-const COL = { date: 1, pallet: 2, part: 3, qty: 4, invoice: 5, category: 6, emailDate: 7, file: 8, email: 9, key: 10 };
+  'Category', 'Email Date', 'PDF File', 'Email', 'Key', 'Comment'];
+const COL = { date: 1, pallet: 2, part: 3, qty: 4, invoice: 5, category: 6, emailDate: 7, file: 8, email: 9, key: 10,
+  comment: 11 };
+const MAX_COMMENT = 500;
 const CATEGORIES = ['Defect', 'Core', 'New Return'];
 
 // ---------------------------------------------------------------------------
@@ -99,7 +102,7 @@ function readInvoice(item, part) {
 }
 
 /** Saves the return on the open pallet and rebuilds the "By Pallet" and "By Invoice" tabs. */
-function recordReturn(item, part, invoice, qty, category) {
+function recordReturn(item, part, invoice, qty, category, comment) {
   part = String(part || '').trim().toUpperCase();
   invoice = String(invoice || '').trim().toUpperCase();
   qty = Number(qty === undefined ? 1 : qty);
@@ -113,10 +116,11 @@ function recordReturn(item, part, invoice, qty, category) {
   lock.waitLock(20000);
   try {
     const sh = sheet_(RETURNS);
+    ensureCommentColumn_(sh);
     const pallet = openPallet_();
     const link = 'https://mail.google.com/mail/u/0/#all/' + item.threadId;
     sh.appendRow([new Date(), pallet, part, qty, invoice, cat, new Date(item.dateIso),
-      item.fileName, '', norm_(part) + '|' + item.key]);
+      item.fileName, '', norm_(part) + '|' + item.key, cleanComment_(comment)]);
     const row = sh.getLastRow();
     sh.getRange(row, COL.email).setFormula('=HYPERLINK("' + link + '","Open")');
     if (row > 2) {
@@ -167,6 +171,8 @@ function undoReturn(item, part, invoice) {
 
 /** All pallets, newest first: number, dates as text, open or finished, how many parts are on it. */
 function getPallets() {
+  // The page loads the pallets first thing, so this is where older sheets get the Comment column.
+  ensureCommentColumn_(sheet_(RETURNS));
   const tz = ss_().getSpreadsheetTimeZone();
   const day = function (d) { return d instanceof Date ? Utilities.formatDate(d, tz, 'd MMM yyyy') : String(d || ''); };
   const qty = palletQty_();
@@ -185,6 +191,7 @@ function getPallet(number) {
       return { id: rowId_(r), part: String(r[COL.part - 1]), qty: Number(r[COL.qty - 1]) || 1,
         invoice: String(r[COL.invoice - 1]),
         category: String(r[COL.category - 1]) || 'Defect',
+        comment: String(r[COL.comment - 1] || ''),
         when: r[0] instanceof Date ? Utilities.formatDate(r[0], tz, 'd MMM yyyy') : String(r[0]) };
     });
 }
@@ -203,6 +210,46 @@ function setCategory(id, category) {
     }
     throw new Error('That return was not found.');
   });
+}
+
+/** Adds, changes or (when empty) clears the comment on one return (by its id from getPallet). */
+function setComment(id, comment) {
+  return withLock_(function () {
+    const rows = returnRows_();
+    for (let i = 0; i < rows.length; i++) {
+      if (rowId_(rows[i]) === id) {
+        sheet_(RETURNS).getRange(i + 2, COL.comment).setValue(cleanComment_(comment));
+        rebuildAll_();
+        return { comment: String(comment || '').replace(/\s+/g, ' ').trim().slice(0, MAX_COMMENT) };
+      }
+    }
+    throw new Error('That return was not found. It may have been deleted.');
+  });
+}
+
+/**
+ * A comment as it is stored: one line, at most MAX_COMMENT characters. A leading
+ * apostrophe stops Sheets reading text such as "=see note" or "-2 damaged" as a formula.
+ */
+function cleanComment_(comment) {
+  const c = String(comment || '').replace(/\s+/g, ' ').trim().slice(0, MAX_COMMENT);
+  return /^[=+\-@]/.test(c) ? "'" + c : c;
+}
+
+/**
+ * Sheets made before comments end at Key: give them the Comment heading (column K) and
+ * widen the filter to cover it. Cheap when it is already there: reads one cell.
+ */
+function ensureCommentColumn_(sh) {
+  if (sh.getRange(1, COL.comment).getValue() === 'Comment') return;
+  sh.getRange(1, COL.comment).setValue('Comment')
+    .setFontWeight('bold').setBackground('#1d7a3a').setFontColor('#ffffff');
+  sh.setColumnWidth(COL.comment, 300);
+  const filter = sh.getFilter();
+  if (filter && filter.getRange().getLastColumn() < RETURN_HEADERS.length) {
+    filter.remove();
+    sh.getRange(1, 1, sh.getMaxRows(), RETURN_HEADERS.length).createFilter();
+  }
 }
 
 /** Finishes the open pallet and starts the next one. */
@@ -338,6 +385,7 @@ function setupReturns_(ss) {
   [170, 70, 140, 80, 140, 90, 110, 200, 70].forEach(function (w, i) { sh.setColumnWidth(i + 1, w); });
   sh.hideColumns(COL.key);
   if (!sh.getFilter()) sh.getRange(1, 1, sh.getMaxRows(), RETURN_HEADERS.length).createFilter();
+  ensureCommentColumn_(sh);
 
   if (!ss.getSheetByName(PALLETS)) {
     const p = ss.insertSheet(PALLETS);
@@ -605,14 +653,14 @@ function rebuildByPallet_() {
   const day = function (d) { return d instanceof Date ? Utilities.formatDate(d, tz, 'd MMM yyyy') : String(d || ''); };
   const rows = returnRows_();
 
-  const values = [['Pallet', 'Part Number', 'Quantity', 'Invoice Number', 'Date Returned', 'Category']];
+  const values = [['Pallet', 'Part Number', 'Quantity', 'Invoice Number', 'Date Returned', 'Category', 'Comment']];
   const groupRows = [];
   const block = function (title, status, g) {
     groupRows.push(values.length + 1);
-    values.push([title, status, g.reduce(function (n, r) { return n + (Number(r[COL.qty - 1]) || 1); }, 0), '', '', '']);
+    values.push([title, status, g.reduce(function (n, r) { return n + (Number(r[COL.qty - 1]) || 1); }, 0), '', '', '', '']);
     g.forEach(function (r) {
       values.push(['', r[COL.part - 1], r[COL.qty - 1], r[COL.invoice - 1], r[COL.date - 1],
-        String(r[COL.category - 1]) || 'Defect']);
+        String(r[COL.category - 1]) || 'Defect', String(r[COL.comment - 1] || '')]);
     });
   };
   const list = pallets_();
@@ -627,15 +675,15 @@ function rebuildByPallet_() {
   const loose = rows.filter(function (r) { return !known[Number(r[COL.pallet - 1])]; });
   if (loose.length) block('No pallet', '', loose);
 
-  out.getRange(1, 1, values.length, 6).setNumberFormats(values.map(function () {
-    return ['@', '@', '0', '@', 'd mmm yyyy', '@'];
+  out.getRange(1, 1, values.length, 7).setNumberFormats(values.map(function () {
+    return ['@', '@', '0', '@', 'd mmm yyyy', '@', '@'];
   })).setValues(values);
-  out.getRange(1, 1, 1, 6).setFontWeight('bold').setBackground('#1d7a3a').setFontColor('#ffffff');
+  out.getRange(1, 1, 1, 7).setFontWeight('bold').setBackground('#1d7a3a').setFontColor('#ffffff');
   groupRows.forEach(function (r) {
-    out.getRange(r, 1, 1, 6).setFontWeight('bold').setBackground('#e3f5e8');
+    out.getRange(r, 1, 1, 7).setFontWeight('bold').setBackground('#e3f5e8');
   });
   out.setFrozenRows(1);
-  [110, 220, 90, 160, 130, 90].forEach(function (w, i) { out.setColumnWidth(i + 1, w); });
+  [110, 220, 90, 160, 130, 90, 300].forEach(function (w, i) { out.setColumnWidth(i + 1, w); });
 }
 
 /** Rebuilds the "By Invoice" tab: one block per invoice number, listing the parts returned. */
@@ -655,27 +703,27 @@ function rebuildByInvoice_() {
     return a.toLowerCase() < b.toLowerCase() ? -1 : 1;
   });
 
-  const values = [['Invoice Number', 'Part Number', 'Quantity', 'Date Returned', 'Pallet', 'Category']];
+  const values = [['Invoice Number', 'Part Number', 'Quantity', 'Date Returned', 'Pallet', 'Category', 'Comment']];
   const groupRows = [];
   keys.forEach(function (k) {
     const g = groups[k].sort(function (a, b) {
       return String(a[COL.part - 1]).localeCompare(String(b[COL.part - 1]));
     });
     groupRows.push(values.length + 1);
-    values.push([k, 'Total returned', g.reduce(function (n, r) { return n + (Number(r[COL.qty - 1]) || 1); }, 0), '', '', '']);
+    values.push([k, 'Total returned', g.reduce(function (n, r) { return n + (Number(r[COL.qty - 1]) || 1); }, 0), '', '', '', '']);
     g.forEach(function (r) {
       values.push(['', r[COL.part - 1], r[COL.qty - 1], r[COL.date - 1], r[COL.pallet - 1],
-        String(r[COL.category - 1]) || 'Defect']);
+        String(r[COL.category - 1]) || 'Defect', String(r[COL.comment - 1] || '')]);
     });
   });
 
-  out.getRange(1, 1, values.length, 6).setNumberFormats(values.map(function () {
-    return ['@', '@', '0', 'd mmm yyyy', '0', '@'];
+  out.getRange(1, 1, values.length, 7).setNumberFormats(values.map(function () {
+    return ['@', '@', '0', 'd mmm yyyy', '0', '@', '@'];
   })).setValues(values);
-  out.getRange(1, 1, 1, 6).setFontWeight('bold').setBackground('#1d7a3a').setFontColor('#ffffff');
+  out.getRange(1, 1, 1, 7).setFontWeight('bold').setBackground('#1d7a3a').setFontColor('#ffffff');
   groupRows.forEach(function (r) {
-    out.getRange(r, 1, 1, 6).setFontWeight('bold').setBackground('#e3f5e8');
+    out.getRange(r, 1, 1, 7).setFontWeight('bold').setBackground('#e3f5e8');
   });
   out.setFrozenRows(1);
-  [160, 160, 90, 130, 70, 90].forEach(function (w, i) { out.setColumnWidth(i + 1, w); });
+  [160, 160, 90, 130, 70, 90, 300].forEach(function (w, i) { out.setColumnWidth(i + 1, w); });
 }
