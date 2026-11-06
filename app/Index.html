@@ -1,0 +1,135 @@
+<!doctype html>
+<html>
+<head>
+<base target="_top">
+<meta charset="utf-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+<style>
+  :root {
+    --bg: #fafaf9; --card: #fff; --soft: #f4f4f3; --text: #18181b; --muted: #6b6b70; --line: #e7e5e4;
+    --line-strong: #d6d3d1; --ok: #15803d; --ok-bg: #f0fdf4; --bad: #c2410c; --bad-text: #9a3412;
+    --bad-bg: #fff7ed; --bad-line: #f97316; --warn: #b45309; --danger: #b91c1c; --focus: #2563eb;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 18px/1.5 Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  button, input { font: inherit; color: inherit; }
+  button { cursor: pointer; border: 0; background: none; padding: 0; }
+  button:disabled { cursor: not-allowed; }
+  :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+  [hidden] { display: none !important; }
+
+  /* Top bar */
+  .appbar { background: var(--card); border-bottom: 1px solid var(--line); }
+  .appbar .in { max-width: 1240px; margin: 0 auto; padding: 0 16px; display: flex; flex-wrap: wrap;
+                align-items: center; column-gap: 40px; }
+  .appbar .brand { display: flex; align-items: center; gap: 10px; height: 64px; font-size: 20px; font-weight: 700;
+                   letter-spacing: -0.01em; }
+  .appbar .brand::before { content: ""; width: 12px; height: 12px; border-radius: 3px; background: #f5b700; }
+  .appbar .sections { display: flex; gap: 28px; }
+  .appbar .sections button { height: 64px; font-size: 18px; font-weight: 600; color: var(--muted);
+                             border-bottom: 2px solid transparent; }
+  .appbar .sections button:hover { color: var(--text); }
+  .appbar .sections button.on { color: var(--text); border-bottom-color: var(--text); }
+  .appbar .links { margin-left: auto; display: flex; flex-wrap: wrap; gap: 4px 20px; padding: 8px 0; font-size: 16px; }
+  .appbar .links a { color: var(--muted); }
+  .appbar .links a:hover { color: var(--text); }
+
+  /* Shared buttons */
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; padding: 0 18px;
+         border-radius: 10px; border: 1px solid var(--line); background: var(--card); color: var(--text);
+         font-size: 17px; font-weight: 600; text-decoration: none; white-space: nowrap; }
+  .btn:hover { border-color: #a8a29e; }
+  .btn.primary { background: var(--text); border-color: var(--text); color: #fff; }
+  .btn.primary:hover { background: #3f3f46; }
+  .btn.danger { color: var(--danger); }
+  .btn.danger:hover { border-color: var(--danger); }
+  .btn.on { background: var(--text); border-color: var(--text); color: #fff; }
+  .btn:disabled, .btn:disabled:hover { background: var(--soft); border-color: var(--soft); color: #8a8a90; }
+  .link { min-height: 44px; font-size: 16px; font-weight: 500; color: var(--muted); text-decoration: underline;
+          text-underline-offset: 3px; text-decoration-color: #d4d4d8; }
+  .link:hover { color: var(--text); text-decoration-color: var(--text); }
+  .link.danger:hover { color: var(--danger); text-decoration-color: var(--danger); }
+  .seg { display: inline-flex; flex-wrap: wrap; gap: 4px; padding: 4px; border-radius: 12px; background: #f0efed; }
+  .seg button { min-height: 44px; padding: 0 18px; border-radius: 9px; font-size: 17px; font-weight: 600; color: var(--muted); }
+  .seg button:hover { color: var(--text); }
+  .seg button.on { background: var(--card); color: var(--text); box-shadow: 0 1px 2px rgba(24, 24, 27, .08); }
+  .lbl { font-size: 14px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+
+  /* The three kinds of worker: icon in a coloured circle, and name tags in the same colour */
+  .ico { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px;
+         border-radius: 50%; flex: none; }
+  .ico svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 2;
+             stroke-linecap: round; stroke-linejoin: round; }
+  .ico.sm { width: 22px; height: 22px; }
+  .ico.sm svg { width: 14px; height: 14px; }
+  .i-full { background: #dce7fb; color: #1e4fa8; }
+  .i-part { background: #ede4fd; color: #6d28d9; }
+  .i-driver { background: #d5f0ec; color: #0f766e; }
+  .t-full { background: #eef3fd; color: #1e4fa8; }
+  .t-part { background: #f4eefc; color: #5b2e9e; }
+  .t-driver { background: #e6f5f3; color: #0f5f58; }
+</style>
+<script>
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s || '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const call = (fn, ...args) => new Promise((ok, fail) =>
+    google.script.run.withSuccessHandler(ok).withFailureHandler(fail)[fn](...args));
+  // Icon for a kind of worker ('full', 'part', 'driver'); size '' or 'sm'.
+  // `decorative`: the words are already next to it, so screen readers skip the icon.
+  const TYPE_NAMES = { full: 'Full time', part: 'Part time', driver: 'Driver' };
+  const typeIcon = (type, size, decorative) => TYPE_NAMES[type]
+    ? '<span class="ico ' + (size || '') + ' i-' + type + '"'
+      + (decorative ? ' aria-hidden="true">' : ' role="img" aria-label="' + TYPE_NAMES[type] + '">')
+      + '<svg aria-hidden="true"><use href="#ic-' + type + '"></use></svg></span>'
+    : '';
+</script>
+</head>
+<body data-section="<?= section ?>">
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="ic-full" viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><circle cx="12" cy="10" r="3"/><path d="M8 17a4 4 0 0 1 8 0"/></symbol>
+  <symbol id="ic-part" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+  <symbol id="ic-driver" viewBox="0 0 24 24"><path d="M2 6h12v10H2z"/><path d="M14 9h4l4 4v3h-8"/><circle cx="6" cy="17.5" r="2"/><circle cx="17" cy="17.5" r="2"/></symbol>
+</svg>
+<header class="appbar">
+  <div class="in">
+    <div class="brand">PureTech</div>
+    <nav class="sections" aria-label="Sections">
+      <button data-section="returns">Returns</button>
+      <button data-section="receiving">Receiving</button>
+      <button data-section="scheduling">Scheduling</button>
+    </nav>
+    <nav class="links" aria-label="Spreadsheet"><a id="sheetLink" target="_blank" href="#">Open spreadsheet</a><a id="excelLink" href="#">Download Excel</a></nav>
+  </div>
+</header>
+
+<?!= include_('ReturnsPage') ?>
+
+<?!= include_('ReceivingPage') ?>
+
+<?!= include_('SchedulePage') ?>
+
+<script>
+  call('getConfig').then(c => { $('sheetLink').href = c.sheetUrl; $('excelLink').href = c.excelUrl; });
+
+  function showSection(name) {
+    $('returnsSection').hidden = name !== 'returns';
+    $('receivingSection').hidden = name !== 'receiving';
+    $('schedulingSection').hidden = name !== 'scheduling';
+    document.querySelectorAll('.appbar .sections button').forEach(b => {
+      b.classList.toggle('on', b.dataset.section === name);
+      if (b.dataset.section === name) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current');
+    });
+    if (name === 'scheduling') Scheduling.open();
+    else if (name === 'receiving') Receiving.open();
+    else $('part').focus();
+  }
+  document.querySelector('.appbar .sections').addEventListener('click', e => {
+    const b = e.target.closest('button');
+    if (b) showSection(b.dataset.section);
+  });
+  showSection(['receiving', 'scheduling'].includes(document.body.dataset.section) ? document.body.dataset.section : 'returns');
+</script>
+</body>
+</html>

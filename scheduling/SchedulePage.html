@@ -1,0 +1,788 @@
+<!-- PureTech — Scheduling section. Pasted into Index.html. -->
+<style>
+  .scheduling { max-width: 1240px; margin: 0 auto; padding: 28px 16px 60px; }
+  .sc-top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 20px; }
+  .sc-weeknav { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  .scheduling h1 { margin: 0 12px 0 0; font-size: 30px; font-weight: 700; letter-spacing: -0.02em; }
+  .scheduling .btn.sq { width: 48px; padding: 0; }
+  .sc-msg { margin: 0 0 16px; color: var(--muted); }
+  .sc-msg:empty { display: none; }
+  .sc-msg.ok { padding: 12px 16px; border-radius: 12px; background: var(--ok-bg); border: 1px solid #bbf7d0; color: #166534; font-weight: 600; }
+  .sc-msg.err { padding: 12px 16px; border-radius: 12px; background: #fef2f2; border: 1px solid #fecaca; color: var(--danger); font-weight: 600; }
+  .sc-hint { margin: 0; color: var(--muted); }
+
+  /* Week summary */
+  .sc-summary { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 20px; }
+  .sc-summary:empty { display: none; }
+  .sc-sum { flex: 1 1 220px; display: flex; align-items: center; gap: 12px; padding: 14px 18px; border-radius: 12px;
+            background: var(--card); border: 1px solid var(--line); }
+  .sc-sum.info { color: var(--muted); border-style: dashed; }
+  .sc-sum.bad { flex: 3 1 420px; align-items: flex-start; background: var(--bad-bg); border-color: #fed7aa; color: #7c2d12; }
+  .sc-sum .dot { flex: none; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center;
+                 justify-content: center; font-size: 16px; font-weight: 700; background: #dcfce7; color: var(--ok); }
+  .sc-sum.bad .dot { background: #ffedd5; color: var(--bad); }
+  .sc-sum .list { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
+  .sc-sum .list button { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; min-height: 36px; text-align: left;
+                         font-size: 17px; color: #7c2d12; text-decoration: underline; text-decoration-color: #fdba74;
+                         text-underline-offset: 3px; }
+  .sc-sum .list button:hover { text-decoration-color: #7c2d12; }
+
+  /* Day cards: numbers only */
+  .sc-week { display: grid; grid-template-columns: repeat(auto-fit, minmax(148px, 1fr)); gap: 10px; align-items: stretch; }
+  .sc-day { display: flex; flex-direction: column; min-width: 0; text-align: left; background: var(--card);
+            border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+  button.sc-day:hover { border-color: #a8a29e; }
+  .sc-day.short, button.sc-day.short:hover { border-color: var(--bad-line); box-shadow: 0 0 0 1px var(--bad-line); }
+  .sc-day.sel, button.sc-day.sel:hover { border-color: var(--text); box-shadow: 0 0 0 2px var(--text); }
+  .sc-day.closed { background: transparent; border-style: dashed; border-color: var(--line-strong); color: var(--muted); }
+  .sc-day.flash { animation: sc-flash 1.6s ease-out 2; }
+  @keyframes sc-flash { 0% { box-shadow: 0 0 0 6px #f5b700; } 100% { box-shadow: 0 0 0 0 #f5b70000; } }
+  .sc-dayhead { display: block; width: 100%; padding: 12px 12px 10px; }
+  .sc-day.today .sc-dayhead { background: var(--text); color: #fff; }
+  .sc-dow { display: flex; justify-content: space-between; align-items: baseline; gap: 6px; font-size: 14px; font-weight: 600;
+            text-transform: uppercase; letter-spacing: .06em; }
+  .sc-todaytag { font-size: 12px; font-weight: 700; letter-spacing: 0; background: #f5b700; color: var(--text);
+                 border-radius: 6px; padding: 1px 6px; }
+  .sc-num { display: block; font-size: 28px; font-weight: 700; line-height: 1.15; font-variant-numeric: tabular-nums; }
+  .sc-num small { font-size: 16px; font-weight: 500; opacity: .75; }
+  .sc-status { display: block; width: 100%; padding: 4px 12px; font-size: 14px; font-weight: 600; }
+  .sc-status.ok { background: var(--ok-bg); color: var(--ok); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+  .sc-status.bad { background: var(--bad); color: #fff; }
+  .sc-counts { display: flex; flex-direction: column; gap: 6px; width: 100%; padding: 10px 12px 8px; }
+  .sc-count { display: flex; align-items: center; gap: 8px; padding: 4px 8px; border-radius: 8px; background: var(--bg);
+              font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .sc-count small { font-size: inherit; font-weight: 500; opacity: .7; }
+  .sc-count .mk { margin-left: auto; font-size: 15px; color: var(--ok); }
+  .sc-count.bad { background: var(--bad-bg); color: var(--bad-text); box-shadow: inset 0 0 0 1.5px var(--bad-line); }
+  .sc-count.bad .mk { color: var(--bad); }
+  .sc-extra { display: block; min-height: 33px; padding: 0 12px 12px; font-size: 14px; color: var(--muted); }
+
+  /* The day panel under the week */
+  .sc-panel { margin-top: 16px; background: var(--card); border: 1px solid var(--line); border-radius: 16px;
+              padding: 22px 24px 24px; display: flex; flex-direction: column; gap: 20px; }
+  .sc-panel:empty { display: none; }
+  .sc-panelhead { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
+  .sc-panelhead h2 { margin: 0; font-size: 26px; font-weight: 700; letter-spacing: -0.01em; }
+  .sc-panelhead .sub { color: var(--muted); font-size: 17px; }
+  .sc-panelhead .sub .ok { color: var(--ok); font-weight: 600; }
+  .sc-panelhead .sub .bad { color: var(--bad); font-weight: 600; }
+  .sc-panelhead .acts { display: flex; flex-wrap: wrap; gap: 8px; }
+  .sc-changesbox { background: var(--bg); border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; }
+  .sc-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 24px; }
+  .sc-colhead { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; padding-bottom: 6px;
+                border-bottom: 1px solid #f0efed; font-weight: 600; }
+  .sc-colhead .cnt { margin-left: auto; font-size: 16px; color: var(--ok); }
+  .sc-colhead .cnt.bad { color: var(--bad); }
+  .sc-colhead .cnt.none { color: var(--muted); font-weight: 400; }
+  .sc-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+  .sc-tag { display: inline-flex; align-items: center; gap: 6px; border-radius: 8px; padding: 4px 10px; font-size: 16px;
+            font-weight: 500; white-space: nowrap; }
+  .sc-tag.ic { padding: 4px 12px 4px 4px; border-radius: 999px; }
+  .sc-tag.extra { box-shadow: inset 0 0 0 1.5px currentColor; }
+  .sc-tag.off { background: var(--soft); color: var(--muted); }
+  .sc-tag small { font-size: 12px; font-weight: 600; opacity: .85; }
+  .sc-gap { display: inline-flex; align-items: center; padding: 3px 10px; border: 1.5px dashed var(--bad-line); border-radius: 8px;
+            background: var(--bad-bg); color: var(--bad-text); font-size: 15px; font-weight: 600; }
+  .sc-empty { color: var(--muted); font-size: 16px; }
+  .sc-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin-top: 20px; font-size: 15px; color: var(--muted); }
+  .sc-legend .k { display: inline-flex; align-items: center; gap: 6px; }
+
+  /* Make changes */
+  .sc-choices { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 24px; }
+  .sc-choices button { flex: 1 1 240px; display: flex; flex-direction: column; gap: 4px; padding: 18px 20px; text-align: left;
+                       background: var(--card); border: 1px solid var(--line); border-radius: 14px; }
+  .sc-choices button:hover { border-color: #a8a29e; }
+  .sc-choices button.on { border-color: var(--text); box-shadow: 0 0 0 1px var(--text); }
+  .sc-choices .big { font-size: 20px; font-weight: 700; }
+  .sc-choices .small { font-size: 15px; color: var(--muted); }
+  .sc-card { display: flex; flex-direction: column; gap: 30px; margin-bottom: 28px; padding: 26px; background: var(--card);
+             border: 1px solid var(--line); border-radius: 16px; }
+  .sc-step { display: flex; align-items: center; gap: 12px; margin: 0 0 14px; font-size: 20px; font-weight: 600; }
+  .sc-step .n { flex: none; width: 28px; height: 28px; border-radius: 50%; background: #f0efed; color: #52525b; font-size: 15px;
+                display: inline-flex; align-items: center; justify-content: center; }
+  .sc-step .opt { font-size: 16px; font-weight: 400; color: var(--muted); }
+  .sc-daypick { display: flex; gap: 8px; overflow-x: auto; padding: 2px; }
+  .sc-daypick button { flex: 1 0 84px; display: flex; flex-direction: column; align-items: center; padding: 10px 6px;
+                       background: var(--card); border: 1px solid var(--line); border-radius: 12px; }
+  .sc-daypick button:hover { border-color: #a8a29e; }
+  .sc-daypick button.arrow { flex: 0 0 48px; justify-content: center; }
+  .sc-daypick b { font-size: 17px; font-weight: 600; }
+  .sc-daypick span { font-size: 15px; color: var(--muted); }
+  .sc-daypick i { font-style: normal; font-size: 14px; font-weight: 600; color: var(--ok); }
+  .sc-daypick .bad i { color: var(--bad); }
+  .sc-daypick .closed { background: transparent; border-style: dashed; }
+  .sc-daypick .closed i { color: var(--muted); }
+  .sc-daypick .sel, .sc-daypick .sel:hover { background: var(--text); border-color: var(--text); color: #fff; }
+  .sc-daypick .sel span, .sc-daypick .sel.closed i { color: #d4d4d8; }
+  .sc-daypick .sel i { color: #86efac; }
+  .sc-daypick .sel.bad i { color: #fdba74; }
+  .sc-groups { display: flex; flex-direction: column; gap: 18px; }
+  .sc-grouphead { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; font-weight: 600; }
+  .sc-grouphead .info { font-size: 15px; font-weight: 400; color: var(--muted); }
+  .sc-grouphead .info.bad { color: var(--bad); font-weight: 600; }
+  .sc-pick { display: flex; flex-wrap: wrap; gap: 8px; }
+  .sc-pick button { display: inline-flex; align-items: center; gap: 8px; min-height: 46px; padding: 0 18px; border-radius: 999px;
+                    font-size: 17px; font-weight: 500; white-space: nowrap; }
+  .sc-pick button.sel { box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--text); font-weight: 700; }
+  .sc-pick small { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; opacity: .85; }
+  .sc-reasons { display: flex; flex-wrap: wrap; gap: 8px; }
+  .sc-savebar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px;
+                padding-top: 24px; border-top: 1px solid #f0efed; }
+  .sc-preview { font-weight: 600; }
+  .sc-preview.ok { color: var(--ok); }
+  .sc-preview.bad { color: var(--bad); }
+  .sc-savebar .btn, .sc-bar .sc-save { height: 56px; padding: 0 30px; font-size: 19px; }
+  .sc-section { display: flex; flex-direction: column; gap: 12px; margin-bottom: 28px; }
+  .sc-section h2 { margin: 0; font-size: 22px; font-weight: 700; }
+  .sc-section h2.lbl { font-size: 14px; }
+  .sc-change { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding: 12px 0; border-top: 1px solid #f0efed; }
+  .sc-change:first-child { border-top: 0; }
+  .sc-change .when { min-width: 110px; font-weight: 600; }
+  .sc-change .what { flex: 1 1 160px; color: #52525b; }
+
+  /* Master scheduling */
+  .sc-mingrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+  .sc-min { display: flex; flex-direction: column; gap: 6px; padding: 12px; background: var(--card); border: 1px solid var(--line);
+            border-radius: 14px; }
+  .sc-min.short { border-color: var(--bad-line); box-shadow: 0 0 0 1px var(--bad-line); }
+  .sc-min .head { display: flex; justify-content: space-between; align-items: baseline; font-weight: 700; }
+  .sc-min .head span { font-size: 15px; font-weight: 600; color: var(--ok); }
+  .sc-min.short .head span { color: var(--bad); }
+  .sc-need { display: flex; align-items: center; gap: 6px; }
+  .sc-need button { width: 40px; height: 40px; border-radius: 9px; border: 1px solid var(--line); background: var(--card); font-size: 20px; }
+  .sc-need button:hover { border-color: #a8a29e; }
+  .sc-need button:disabled { color: #c4c4c8; border-color: #f0efed; }
+  .sc-need b { min-width: 24px; text-align: center; font-variant-numeric: tabular-nums; }
+  .sc-have { margin: -4px 0 4px 28px; font-size: 14px; color: var(--muted); }
+  .sc-have.bad { color: var(--bad); font-weight: 600; }
+  .sc-teamhead { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
+  .sc-person { display: flex; flex-direction: column; gap: 10px; padding: 14px 16px; background: var(--card); border: 1px solid var(--line);
+               border-radius: 14px; }
+  .sc-person.paused { background: var(--soft); border-style: dashed; border-color: var(--line-strong); }
+  .sc-person.paused .sc-name, .sc-person.paused .sc-days { opacity: .6; }
+  .sc-prow { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 12px; }
+  .sc-name { flex: 1 1 180px; min-width: 0; height: 46px; padding: 0 14px; font-size: 18px; font-weight: 600;
+             border: 1px solid var(--line-strong); border-radius: 10px; background: var(--card); }
+  .sc-name:focus { outline: none; border-color: var(--text); box-shadow: 0 0 0 1px var(--text); }
+  .sc-types { display: flex; flex-wrap: wrap; gap: 6px; }
+  .sc-types button { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 12px 0 8px;
+                     border: 1px solid var(--line); border-radius: 10px; background: var(--card); color: var(--muted);
+                     font-size: 16px; font-weight: 600; }
+  .sc-types button:hover { border-color: #a8a29e; color: var(--text); }
+  .sc-types button.on { border-color: currentColor; }
+  .sc-types button.on.t-full { background: #eef3fd; color: #1e4fa8; }
+  .sc-types button.on.t-part { background: #f4eefc; color: #5b2e9e; }
+  .sc-types button.on.t-driver { background: #e6f5f3; color: #0f5f58; }
+  .sc-days { display: flex; flex-wrap: wrap; gap: 6px; }
+  .sc-days button { width: 54px; height: 44px; border: 1px solid var(--line); border-radius: 10px; background: var(--card);
+                    color: var(--muted); font-size: 15px; font-weight: 600; }
+  .sc-days button:hover { border-color: #a8a29e; }
+  .sc-days button.on { background: var(--text); border-color: var(--text); color: #fff; }
+  .sc-psum { font-size: 15px; color: var(--muted); }
+  .sc-spacer { flex: 1; }
+  .sc-bar { position: sticky; bottom: 0; z-index: 1; margin: 0 -16px; padding: 14px 16px; display: flex; flex-wrap: wrap;
+            align-items: center; gap: 12px 16px; background: rgba(255, 255, 255, .97); border-top: 1px solid var(--line); }
+  .sc-bar .text { flex: 1 1 260px; font-size: 16px; color: var(--muted); }
+  .sc-bar .text.err { color: var(--danger); font-weight: 600; }
+</style>
+
+<main id="schedulingSection" class="scheduling" hidden>
+  <div class="sc-top">
+    <div class="sc-weeknav" id="scWeekNav">
+      <h1 id="scRange"></h1>
+      <button class="btn sq" id="scPrev" aria-label="Last week">◀</button>
+      <button class="btn sq" id="scNext" aria-label="Next week">▶</button>
+      <button class="btn" id="scToday">Today</button>
+    </div>
+    <h1 id="scChangesTitle" hidden>Make changes</h1>
+    <nav class="seg sc-views" aria-label="Scheduling">
+      <button data-view="calendar">Calendar</button>
+      <button data-view="changes">Make changes</button>
+    </nav>
+  </div>
+  <div class="sc-msg" id="scMsg" role="status"></div>
+
+  <section id="scCalendar">
+    <div class="sc-summary" id="scSummary"></div>
+    <div class="sc-week" id="scWeek"></div>
+    <div id="scPanel"></div>
+    <div class="sc-legend">
+      <span>Tap a day to see who is working.</span>
+      <span class="k"><span class="ico sm i-full" aria-hidden="true"><svg><use href="#ic-full"></use></svg></span>Full time</span>
+      <span class="k"><span class="ico sm i-part" aria-hidden="true"><svg><use href="#ic-part"></use></svg></span>Part time</span>
+      <span class="k"><span class="ico sm i-driver" aria-hidden="true"><svg><use href="#ic-driver"></use></svg></span>Driver</span>
+      <span class="sc-tag t-full extra">Name <small>+ cover</small></span>
+      <span class="sc-gap">1 more needed</span>
+      <span>12/12 = working / needed</span>
+    </div>
+  </section>
+
+  <section id="scChanges" hidden>
+    <div class="sc-choices" id="scChoices">
+      <button data-mode="off"><span class="big">Day off</span><span class="small">Someone is not coming in</span></button>
+      <button data-mode="extra"><span class="big">Extra cover</span><span class="small">Bring someone in on a day they don't usually work</span></button>
+      <button data-mode="master"><span class="big">Master scheduling</span><span class="small">Add or remove staff, who works which days, and the minimum each day</span></button>
+    </div>
+    <div id="scForm"></div>
+    <div id="scList"></div>
+  </section>
+</main>
+
+<script>
+const Scheduling = (() => {
+  // The three kinds of worker. Their icons are in Index.html (ic-full, ic-part, ic-driver).
+  const TYPES = [
+    { key: 'full', label: 'Full time', many: 'Full time' },
+    { key: 'part', label: 'Part time', many: 'Part time' },
+    { key: 'driver', label: 'Driver', many: 'Drivers' },
+  ];
+  const TYPE = Object.fromEntries(TYPES.map(t => [t.key, t]));
+  const REASONS = ['Sick', 'Holiday', 'Other'];
+  const DAY = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+  const DAY3 = DAY.map(d => d.slice(0, 3));
+
+  // Dates are plain yyyy-mm-dd strings, worked out in UTC so the computer's time zone can't shift a day.
+  const pad = n => String(n).padStart(2, '0');
+  const utc = iso => new Date(iso + 'T00:00:00Z');
+  const addDays = (iso, n) => { const d = utc(iso); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+  const mondayOf = iso => addDays(iso, -((utc(iso).getUTCDay() + 6) % 7));
+  const todayIso = () => { const d = new Date(); return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); };
+  const fmt = (iso, opts) => utc(iso).toLocaleDateString('en-GB', Object.assign({ timeZone: 'UTC' }, opts));
+  const dayIndex = iso => (utc(iso).getUTCDay() + 6) % 7;
+  const shortDate = iso => fmt(iso, { day: 'numeric', month: 'short' });
+  const longDay = iso => DAY[dayIndex(iso)] + ' ' + shortDate(iso);
+  const weekLabel = monday => {
+    const sun = addDays(monday, 6);
+    if (monday.slice(0, 7) === sun.slice(0, 7)) return fmt(monday, { day: 'numeric' }) + ' – ' + fmt(sun, { day: 'numeric', month: 'long', year: 'numeric' });
+    if (monday.slice(0, 4) === sun.slice(0, 4)) return shortDate(monday) + ' – ' + fmt(sun, { day: 'numeric', month: 'short', year: 'numeric' });
+    return fmt(monday, { day: 'numeric', month: 'short', year: 'numeric' }) + ' – ' + fmt(sun, { day: 'numeric', month: 'short', year: 'numeric' });
+  };
+  const count = (n, t) => n + ' ' + (n === 1 ? t.label : t.many);
+  const plural = (n, word) => n + ' ' + word + (n === 1 ? '' : 's');
+  const icon = (type, size) => typeIcon(type, size);
+  const deco = (type, size) => typeIcon(type, size, true);
+
+  const S = {
+    view: 'calendar',
+    monday: mondayOf(todayIso()),  // week shown on the Calendar
+    weeks: {},                     // getWeek results by Monday
+    flash: null,                   // day card to highlight after a change
+    open: null,                    // date of the day whose names are shown under the week
+    note: null,                    // message to show once the calendar has loaded
+    mode: null,                    // Make changes: 'off' | 'extra' | 'master'
+    form: null,                    // { monday, date, name, reason }
+    draft: null,                   // master schedule being edited
+  };
+  let nextId = 1;
+
+  async function week(monday, fresh) {
+    if (fresh || !S.weeks[monday]) S.weeks[monday] = await call('getWeek', monday);
+    return S.weeks[monday];
+  }
+
+  function msg(text, err) {
+    $('scMsg').textContent = text || '';
+    $('scMsg').className = 'sc-msg' + (err ? ' err' : /^✓/.test(text || '') ? ' ok' : '');
+  }
+  const fail = err => msg('Something went wrong: ' + (err && err.message || err), true);
+
+  function showView(view) {
+    if (view !== 'changes' && !leaveDraft()) return;
+    S.view = view;
+    $('scCalendar').hidden = view !== 'calendar';
+    $('scChanges').hidden = view !== 'changes';
+    $('scWeekNav').hidden = view !== 'calendar';
+    $('scChangesTitle').hidden = view !== 'changes';
+    document.querySelectorAll('.sc-views button').forEach(b => {
+      b.classList.toggle('on', b.dataset.view === view);
+      b.setAttribute('aria-pressed', b.dataset.view === view);
+    });
+    msg('');
+    if (view === 'calendar') loadCalendar();
+    else loadChanges();
+  }
+
+  // ------------------------------------------------------------------------
+  // Calendar (view only)
+
+  async function loadCalendar() {
+    const monday = S.monday;
+    $('scRange').textContent = weekLabel(monday);
+    if (!S.weeks[monday]) { $('scSummary').innerHTML = ''; $('scWeek').innerHTML = ''; $('scPanel').innerHTML = ''; msg('Loading…'); }
+    else renderCalendar();
+    try {
+      await week(monday, true);
+    } catch (err) { return fail(err); }
+    if (S.monday !== monday || S.view !== 'calendar') return;
+    msg(S.note);
+    S.note = null;
+    renderCalendar();
+  }
+
+  function renderCalendar() {
+    const w = S.weeks[S.monday];
+    if (!w) return;
+    if (!w.staff.some(s => s.active)) {
+      $('scSummary').innerHTML = '<div class="sc-sum info">No one is on the schedule yet. Press <b>&nbsp;Make changes&nbsp;</b>, then <b>&nbsp;Master scheduling&nbsp;</b>, to add your team.</div>';
+      $('scWeek').innerHTML = '';
+      $('scPanel').innerHTML = '';
+      return;
+    }
+    const good = w.days.filter(d => !d.closed && d.ok).length;
+    const short = w.days.filter(d => !d.ok);
+    $('scSummary').innerHTML = '<div class="sc-sum"><span class="dot" aria-hidden="true">✓</span><span><b>' + plural(good, 'day') + '</b> fully staffed</span></div>'
+      + (short.length ? '<div class="sc-sum bad"><span class="dot" aria-hidden="true">✗</span><div class="list"><b>'
+        + plural(short.length, 'day') + ' short:</b>' + short.map(d => {
+          const types = d.short.map(s => s.type);
+          const away = d.off.filter(o => types.includes(o.type)).map(o => o.name);
+          return '<button data-goto="' + d.date + '">' + esc(longDay(d.date)) + ' needs '
+            + d.short.map(s => icon(s.type, 'sm') + ' ' + s.missing + ' more ' + esc(s.missing === 1 ? TYPE[s.type].label : TYPE[s.type].many)).join(', ')
+            + (away.length ? ' (' + esc(away.join(', ')) + ' off)' : '') + '</button>';
+        }).join('') + '</div></div>' : '');
+    $('scWeek').innerHTML = w.days.map(dayCard).join('');
+    const open = S.open && w.days.find(d => d.date === S.open && !d.closed);
+    $('scPanel').innerHTML = open ? dayPanel(open) : '';
+    if (S.flash) {
+      const el = $('scDay-' + S.flash);
+      S.flash = null;
+      if (el) { el.scrollIntoView({ block: 'center', behavior: 'smooth' }); el.classList.add('flash'); }
+    }
+  }
+
+  // A card shows only the numbers, so it stays the same size however many people work.
+  function dayCard(d, i) {
+    const today = d.date === todayIso();
+    const head = '<span class="sc-dayhead"><span class="sc-dow">' + DAY3[i] + (today ? '<span class="sc-todaytag">TODAY</span>' : '') + '</span>'
+      + '<span class="sc-num">' + fmt(d.date, { day: 'numeric' }) + ' <small>' + fmt(d.date, { month: 'short' }) + '</small></span></span>';
+    if (d.closed) {
+      return '<div class="sc-day closed' + (today ? ' today' : '') + '" id="scDay-' + d.date + '">' + head
+        + '<span class="sc-status">Closed</span></div>';
+    }
+    const sel = S.open === d.date;
+    const counts = TYPES.map(t => {
+      const c = d.counts[t.key];
+      return '<span class="sc-count' + (c.ok ? '' : ' bad') + '" title="' + esc(t.label + ': ' + c.have + ' working, ' + c.need + ' needed') + '">'
+        + icon(t.key) + '<span>' + c.have + '<small>/' + c.need + '</small></span><span class="mk">' + (c.ok ? '✓' : '✗') + '</span></span>';
+    }).join('');
+    const extras = d.people.filter(p => p.status === 'extra').length;
+    const changes = [d.off.length ? d.off.length + ' off' : '', extras ? extras + ' extra' : ''].filter(Boolean).join(' · ');
+    return '<button class="sc-day' + (d.ok ? '' : ' short') + (today ? ' today' : '') + (sel ? ' sel' : '') + '" id="scDay-' + d.date
+      + '" data-day="' + d.date + '" aria-expanded="' + sel + '" aria-controls="scPanel">' + head
+      + '<span class="sc-status ' + (d.ok ? 'ok">✓ Covered' : 'bad">✗ Short') + '</span>'
+      + '<span class="sc-counts">' + counts + '</span>'
+      + '<span class="sc-extra">' + changes + '</span></button>';
+  }
+
+  // Everyone working on the chosen day, under the week.
+  function dayPanel(d) {
+    const extras = d.people.filter(p => p.status === 'extra');
+    const changes = d.off.map(o => '<span class="sc-tag ic off">' + icon(o.type, 'sm') + ' <s>' + esc(o.name) + '</s> <small>Off'
+        + (o.reason ? ' · ' + esc(o.reason) : '') + '</small></span>')
+      .concat(extras.map(p => '<span class="sc-tag ic t-' + p.type + ' extra">' + icon(p.type, 'sm') + ' ' + esc(p.name) + ' <small>+ cover</small></span>'));
+    const cols = TYPES.map(t => {
+      const c = d.counts[t.key];
+      const people = d.people.filter(p => p.type === t.key);
+      const missing = Math.max(0, c.need - c.have);
+      const tags = people.map(p => '<span class="sc-tag t-' + p.type + (p.status === 'extra' ? ' extra' : '') + '">' + esc(p.name)
+          + (p.status === 'extra' ? ' <small>+ cover</small>' : '') + '</span>')
+        .concat(Array.from({ length: missing }, () => '<span class="sc-gap">1 more needed</span>'));
+      return '<div><div class="sc-colhead">' + deco(t.key) + '<span>' + t.many + '</span>'
+        + (c.need ? '<span class="cnt' + (missing ? ' bad' : '') + '">' + c.have + ' of ' + c.need + ' needed ' + (missing ? '✗' : '✓') + '</span>'
+          : '<span class="cnt none">' + c.have + ' working</span>') + '</div>'
+        + '<div class="sc-tags">' + (tags.length ? tags.join('') : '<span class="sc-empty">No one</span>') + '</div></div>';
+    }).join('');
+    return '<section class="sc-panel" aria-labelledby="scPanelTitle"><div class="sc-panelhead"><div>'
+      + '<h2 id="scPanelTitle">' + esc(fmt(d.date, { weekday: 'long', day: 'numeric', month: 'long' })) + '</h2>'
+      + '<div class="sub">' + d.people.length + ' working · <span class="' + (d.ok ? 'ok">✓ Covered' : 'bad">✗ Short') + '</span></div></div>'
+      + '<div class="acts">' + (d.ok ? '' : '<button class="btn primary" data-fix="' + d.date + '">Fix this day →</button>')
+      + '<button class="btn" data-close="1">Close</button></div></div>'
+      + (changes.length ? '<div class="sc-changesbox"><div class="lbl">Changes from the master schedule</div><div class="sc-tags">' + changes.join('') + '</div></div>'
+        : '<p class="sc-hint">No changes. Same as the master schedule.</p>')
+      + '<div class="sc-cols">' + cols + '</div></section>';
+  }
+
+  $('scPrev').addEventListener('click', () => { S.monday = addDays(S.monday, -7); S.open = null; loadCalendar(); });
+  $('scNext').addEventListener('click', () => { S.monday = addDays(S.monday, 7); S.open = null; loadCalendar(); });
+  $('scToday').addEventListener('click', () => { S.monday = mondayOf(todayIso()); S.open = null; S.flash = todayIso(); loadCalendar(); });
+
+  $('scSummary').addEventListener('click', e => {
+    const b = e.target.closest('button[data-goto]');
+    if (!b) return;
+    // Open the short day so it is clear who is missing.
+    S.open = b.dataset.goto;
+    S.flash = b.dataset.goto;
+    renderCalendar();
+  });
+
+  $('scWeek').addEventListener('click', e => {
+    const card = e.target.closest('button.sc-day');
+    if (!card) return;
+    S.open = S.open === card.dataset.day ? null : card.dataset.day;
+    renderCalendar();
+    $('scDay-' + card.dataset.day).focus({ preventScroll: true });
+    if (S.open) $('scPanel').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  });
+
+  $('scPanel').addEventListener('click', e => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    if (b.dataset.close) {
+      const date = S.open;
+      S.open = null;
+      renderCalendar();
+      if ($('scDay-' + date)) $('scDay-' + date).focus();
+      return;
+    }
+    if (b.dataset.fix) {
+      // Most shortages are fixed by bringing someone in.
+      S.mode = 'extra';
+      S.form = { monday: mondayOf(b.dataset.fix), date: b.dataset.fix, name: null, reason: '' };
+      showView('changes');
+    }
+  });
+
+  // ------------------------------------------------------------------------
+  // Make changes
+
+  async function loadChanges() {
+    if (!S.form) S.form = { monday: S.monday, date: null, name: null, reason: '' };
+    const monday = S.form.monday;
+    if (!S.weeks[monday]) { $('scForm').innerHTML = ''; $('scList').innerHTML = ''; msg('Loading…'); }
+    else renderChanges();
+    try {
+      await week(monday, true);
+    } catch (err) { return fail(err); }
+    if (S.view !== 'changes' || S.form.monday !== monday) return;
+    msg('');
+    if (S.mode === 'master' && !S.draft) startMaster();
+    if (S.mode !== 'master') renderChanges();
+  }
+
+  function renderChanges() {
+    document.querySelectorAll('#scChoices button').forEach(b => {
+      b.classList.toggle('on', b.dataset.mode === S.mode);
+      b.setAttribute('aria-pressed', b.dataset.mode === S.mode);
+    });
+    if (S.mode === 'master') { renderMaster(); $('scList').innerHTML = ''; return; }
+    if (!S.mode) $('scForm').innerHTML = '<p class="sc-hint" style="margin-bottom:28px">Tap what you want to change.</p>';
+    else renderForm();
+    renderList();
+  }
+
+  $('scChoices').addEventListener('click', e => {
+    const b = e.target.closest('button');
+    if (!b || b.dataset.mode === S.mode || !leaveDraft()) return;
+    S.mode = b.dataset.mode;
+    S.form = { monday: S.form.monday, date: null, name: null, reason: '' };
+    msg('');
+    if (S.mode === 'master') {
+      if (S.weeks[S.form.monday]) startMaster(); else loadChanges();
+    } else renderChanges();
+  });
+
+  // Day off / Extra cover: 1. which day → 2. who → 3. why (day off only) → Save.
+  function renderForm() {
+    const f = S.form;
+    const w = S.weeks[f.monday];
+    if (!w) return;
+    const isOff = S.mode === 'off';
+    let html = '<div class="sc-card"><div><h3 class="sc-step"><span class="n">1</span>Which day?</h3><div class="sc-daypick">'
+      + '<button class="arrow" data-wk="-7" aria-label="Last week">◀</button>'
+      + w.days.map(d => '<button class="' + (d.date === f.date ? 'sel ' : '') + (d.ok ? '' : 'bad ') + (d.closed ? 'closed' : '')
+        + '" data-date="' + d.date + '" aria-pressed="' + (d.date === f.date) + '">'
+        + '<b>' + DAY3[dayIndex(d.date)] + '</b><span>' + shortDate(d.date) + '</span>'
+        + '<i>' + (d.closed ? 'Closed' : d.ok ? '✓' : '✗ short') + '</i></button>').join('')
+      + '<button class="arrow" data-wk="7" aria-label="Next week">▶</button></div></div>';
+    const d = f.date && w.days.find(x => x.date === f.date);
+    if (d) {
+      const shortTypes = d.short.map(s => s.type);
+      const people = isOff ? d.people : w.staff
+        .filter(s => s.active && TYPE[s.type] && !d.people.some(p => p.name === s.name) && !d.off.some(o => o.name === s.name))
+        .sort((a, b) => a.name.localeCompare(b.name));
+      // For extra cover, the kinds of worker the day is short of come first.
+      const order = isOff ? TYPES : TYPES.slice().sort((a, b) => shortTypes.includes(b.key) - shortTypes.includes(a.key));
+      const groups = order.map(t => {
+        const list = people.filter(p => p.type === t.key);
+        if (!list.length) return '';
+        const isShort = shortTypes.includes(t.key);
+        const missing = d.counts[t.key].need - d.counts[t.key].have;
+        const info = isOff ? d.counts[t.key].have + ' working' : isShort ? count(missing, t) + ' needed' : '';
+        return '<div><div class="sc-grouphead">' + deco(t.key) + '<span>' + t.many + '</span><span class="info' + (!isOff && isShort ? ' bad' : '') + '">'
+          + esc(info) + '</span></div><div class="sc-pick">' + list.map(p =>
+            '<button class="t-' + p.type + (f.name === p.name ? ' sel' : '') + '" data-name="' + esc(p.name) + '" aria-pressed="' + (f.name === p.name) + '">'
+            + esc(p.name)
+            + (!isOff && isShort ? ' <small>needed</small>' : '')
+            + (isOff && p.status === 'extra' ? ' <small>+ cover</small>' : '') + '</button>').join('') + '</div></div>';
+      }).join('');
+      html += '<div><h3 class="sc-step"><span class="n">2</span>' + (isOff ? 'Who is off on ' : 'Who will come in on ') + esc(longDay(d.date)) + '?</h3>'
+        + (people.length ? '<div class="sc-groups">' + groups + '</div>'
+          : '<p class="sc-hint">' + (isOff ? 'No one is working that day.' : 'Everyone is already working that day.')
+            + (!isOff && d.off.length ? ' To bring back someone who is off, press Undo on their day off below.' : '') + '</p>')
+        + '</div>';
+      const person = f.name && people.find(p => p.name === f.name);
+      if (person && isOff && person.status !== 'extra') {
+        html += '<div><h3 class="sc-step"><span class="n">3</span>Why? <span class="opt">(you can skip this)</span></h3><div class="sc-reasons">'
+          + REASONS.map(r => '<button class="btn' + (f.reason === r ? ' on' : '') + '" data-reason="' + r + '" aria-pressed="' + (f.reason === r) + '">' + r + '</button>').join('')
+          + '</div></div>';
+      }
+      if (person) {
+        html += '<div class="sc-savebar">' + preview(d, person, isOff)
+          + '<button class="btn primary sc-save" data-act="save">' + (isOff ? 'Save day off' : 'Save extra cover') + '</button></div>';
+      }
+    }
+    $('scForm').innerHTML = html + '</div>';
+  }
+
+  /** What the day will look like after the change. */
+  function preview(d, person, isOff) {
+    const short = TYPES.map(t => {
+      const c = d.counts[t.key];
+      const have = c.have + (t.key === person.type ? (isOff ? -1 : 1) : 0);
+      return have < c.need ? count(c.need - have, t) : '';
+    }).filter(Boolean);
+    const day = DAY[dayIndex(d.date)];
+    const what = isOff && person.status === 'extra' ? 'This cancels ' + person.name + "'s extra cover. " : '';
+    return '<span class="sc-preview ' + (short.length ? 'bad' : 'ok') + '">' + esc(what)
+      + (short.length ? '✗ ' + day + ' will be short: ' + esc(short.join(', ')) : '✓ ' + day + ' will be fully covered') + '</span>';
+  }
+
+  async function saveChange() {
+    const f = S.form;
+    const btn = document.querySelector('#scForm .sc-save');
+    btn.disabled = true;
+    btn.textContent = 'Saving…';
+    try {
+      if (S.mode === 'off') await call('setDayOff', f.date, f.name, f.reason);
+      else await call('addExtra', f.date, f.name);
+    } catch (err) {
+      btn.disabled = false;
+      btn.textContent = 'Try again';
+      return fail(err);
+    }
+    // Back to the calendar on the changed day, so the result can be seen.
+    delete S.weeks[f.monday];
+    S.monday = f.monday;
+    S.flash = f.date;
+    S.open = f.date;
+    S.note = '✓ Saved: ' + f.name + (S.mode === 'off' ? ' is off on ' : ' is coming in on ') + longDay(f.date) + '.';
+    S.mode = null;
+    S.form = null;
+    showView('calendar');
+  }
+
+  function renderList() {
+    const w = S.weeks[S.form.monday];
+    if (!w) return;
+    const items = [];
+    w.days.forEach(d => {
+      d.off.forEach(o => items.push({ d, p: o, what: 'Day off' + (o.reason ? ' · ' + o.reason : ''), undo: 'day off' }));
+      d.people.filter(p => p.status === 'extra').forEach(p => items.push({ d, p, what: 'Extra cover', undo: 'extra cover' }));
+    });
+    $('scList').innerHTML = '<section class="sc-section"><h2 class="lbl">Changes for ' + esc(weekLabel(w.monday)) + '</h2>'
+      + (items.length ? '<div>' + items.map(x =>
+        '<div class="sc-change"><span class="when">' + esc(DAY3[dayIndex(x.d.date)] + ' ' + shortDate(x.d.date)) + '</span>'
+        + '<span class="sc-tag ic t-' + x.p.type + '">' + icon(x.p.type, 'sm') + ' ' + esc(x.p.name) + '</span>'
+        + '<span class="what">' + esc(x.what) + '</span>'
+        + '<button class="btn" data-undo-date="' + x.d.date + '" data-undo-name="' + esc(x.p.name) + '" data-undo-what="' + x.undo + '">Undo</button></div>').join('') + '</div>'
+        : '<p class="sc-hint">No changes this week. It follows the master schedule.</p>')
+      + '</section>';
+  }
+
+  $('scList').addEventListener('click', async e => {
+    const b = e.target.closest('button[data-undo-date]');
+    if (!b) return;
+    const { undoDate: date, undoName: name, undoWhat: what } = b.dataset;
+    if (!confirm('Undo ' + name + "'s " + what + ' on ' + longDay(date) + '?')) return;
+    b.disabled = true;
+    try {
+      await call('removeChange', date, name);
+      await week(S.form.monday, true);
+    } catch (err) { b.disabled = false; return fail(err); }
+    msg('✓ Undone. ' + longDay(date) + ' is back to the master schedule for ' + name + '.');
+    renderChanges();
+  });
+
+  // ------------------------------------------------------------------------
+  // Master scheduling: the minimum per day, and each person's kind and working days
+
+  function startMaster() {
+    const w = S.weeks[S.form.monday];
+    S.draft = {
+      staff: w.staff.map(s => ({ id: nextId++, name: s.name, was: s.name, type: s.type, active: s.active, days: s.days.slice() })),
+      needed: JSON.parse(JSON.stringify(w.needed)),
+      filter: 'all',
+      error: '',
+      dirty: false,
+    };
+    renderChanges();
+  }
+
+  /** Asks before throwing away unsaved changes to the master schedule. Returns false to stay. */
+  function leaveDraft() {
+    if (S.draft && S.draft.dirty && !confirm('Leave without saving the master schedule?')) return false;
+    S.draft = null;
+    if (S.mode === 'master') S.mode = null;
+    return true;
+  }
+
+  const barText = dr => dr.error || (dr.dirty ? 'You have changes that are not saved yet.' : 'No changes yet.');
+
+  function renderMaster() {
+    const dr = S.draft;
+    if (!dr) return;
+    const on = i => dr.staff.filter(s => s.active && TYPE[s.type] && s.days[i]);
+
+    const minimum = DAY.map((name, i) => {
+      const people = on(i);
+      let ok = true;
+      const rows = TYPES.map(t => {
+        const need = dr.needed[t.key][i];
+        const have = people.filter(s => s.type === t.key).length;
+        if (have < need) ok = false;
+        return '<div class="sc-need">' + icon(t.key, 'sm')
+          + '<button data-act="dec" data-day="' + i + '" data-type="' + t.key + '" aria-label="Fewer ' + t.many + ' on ' + name + '"' + (need <= 0 ? ' disabled' : '') + '>−</button>'
+          + '<b>' + need + '</b>'
+          + '<button data-act="inc" data-day="' + i + '" data-type="' + t.key + '" aria-label="More ' + t.many + ' on ' + name + '">+</button></div>'
+          + '<div class="sc-have' + (have < need ? ' bad' : '') + '">' + (have < need ? have + ' on · ' + (need - have) + ' short' : have + ' on ✓') + '</div>';
+      }).join('');
+      return '<div class="sc-min' + (ok ? '' : ' short') + '"><div class="head">' + DAY3[i] + '<span>' + (ok ? '✓' : '✗ Short') + '</span></div>' + rows + '</div>';
+    }).join('');
+
+    const filters = [{ key: 'all', label: 'Everyone' }].concat(TYPES.map(t => ({ key: t.key, label: t.many })));
+    const filterButtons = filters.map(x => {
+      const n = x.key === 'all' ? dr.staff.length : dr.staff.filter(s => s.type === x.key).length;
+      return '<button data-act="filter" data-filter="' + x.key + '" class="' + (dr.filter === x.key ? 'on' : '') + '" aria-pressed="' + (dr.filter === x.key) + '">'
+        + x.label + ' (' + n + ')</button>';
+    }).join('');
+
+    const person = s => {
+      const days = s.days.filter(Boolean).length;
+      return '<div class="sc-person' + (s.active ? '' : ' paused') + '"><div class="sc-prow">'
+        + '<input class="sc-name" data-id="' + s.id + '" value="' + esc(s.name) + '" placeholder="Name" aria-label="Name" autocomplete="off">'
+        + '<div class="sc-types" role="group" aria-label="Kind of worker">' + TYPES.map(t =>
+          '<button class="' + (s.type === t.key ? 't-' + t.key + ' on' : '') + '" data-act="type" data-id="' + s.id + '" data-type="' + t.key + '" aria-pressed="' + (s.type === t.key) + '">'
+          + deco(t.key, 'sm') + t.label + '</button>').join('') + '</div></div>'
+        + '<div class="sc-prow"><div class="sc-days" role="group" aria-label="Works on">' + DAY3.map((l, i) =>
+          '<button class="' + (s.days[i] ? 'on' : '') + '" data-act="day" data-id="' + s.id + '" data-day="' + i + '" aria-pressed="' + !!s.days[i] + '" aria-label="' + DAY[i] + '">' + l + '</button>').join('') + '</div>'
+        + '<span class="sc-psum">' + (!s.active ? 'Away — not on the schedule' : days ? plural(days, 'day') + ' a week' : 'No days yet') + '</span>'
+        + '<span class="sc-spacer"></span>'
+        + '<button class="link" data-act="pause" data-id="' + s.id + '">' + (s.active ? 'Away for a while' : 'Back on the schedule') + '</button>'
+        + '<button class="link danger" data-act="remove" data-id="' + s.id + '">Remove</button></div></div>';
+    };
+    const team = dr.staff.filter(s => dr.filter === 'all' || s.type === dr.filter || !s.type);
+
+    $('scForm').innerHTML = '<p class="sc-hint" style="margin-bottom:20px">The master schedule repeats every week. Days off and extra cover go on top of it.</p>'
+      + '<section class="sc-section"><h2>Minimum needed each day</h2><div class="sc-mingrid">' + minimum + '</div></section>'
+      + '<section class="sc-section"><div class="sc-teamhead"><h2>Your team</h2><button class="btn primary" data-act="new">+ Add person</button></div>'
+      + '<div><div class="seg" role="group" aria-label="Show">' + filterButtons + '</div></div>'
+      + (team.length ? team.map(person).join('') : '<p class="sc-hint">No one here yet. Press <b>+ Add person</b>.</p>')
+      + '</section>'
+      + '<div class="sc-bar"><span class="text' + (dr.error ? ' err' : '') + '" id="scBarText" role="status">' + esc(barText(dr)) + '</span>'
+      + '<button class="btn" data-act="cancelmaster">Cancel</button>'
+      + '<button class="btn primary sc-save" data-act="savemaster">Save master schedule</button></div>';
+  }
+
+  async function saveMaster() {
+    const dr = S.draft;
+    const unnamed = dr.staff.some(s => !s.name.trim());
+    const untyped = dr.staff.find(s => s.name.trim() && !TYPE[s.type]);
+    if (unnamed || untyped) {
+      dr.error = unnamed ? 'Every person needs a name. Type it in, or press Remove.'
+        : 'Pick Full time, Part time or Driver for ' + untyped.name + '.';
+      return renderMaster();
+    }
+    const btn = document.querySelector('#scForm .sc-save');
+    btn.disabled = true;
+    btn.textContent = 'Saving…';
+    try {
+      await call('saveMasterSchedule', {
+        staff: dr.staff.map(s => ({ name: s.name.trim(), was: s.was, type: s.type, active: s.active, days: s.days })),
+        needed: dr.needed,
+      });
+    } catch (err) {
+      dr.error = 'Could not save: ' + (err && err.message || err);
+      return renderMaster();
+    }
+    S.weeks = {};
+    S.draft = null;
+    S.mode = null;
+    S.form = null;
+    S.note = '✓ Master schedule saved.';
+    showView('calendar');
+  }
+
+  $('scForm').addEventListener('input', e => {
+    if (!e.target.matches('.sc-name')) return;
+    const id = Number(e.target.dataset.id);
+    const s = S.draft && S.draft.staff.find(x => x.id === id);
+    if (!s) return;
+    s.name = e.target.value;
+    S.draft.dirty = true;
+    S.draft.error = '';
+    // Only the bar changes, so the cursor stays in the box.
+    $('scBarText').textContent = barText(S.draft);
+    $('scBarText').className = 'text';
+  });
+
+  $('scForm').addEventListener('click', e => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    const f = S.form;
+    // Day off / Extra cover form
+    if (b.dataset.wk) {
+      f.monday = addDays(f.monday, Number(b.dataset.wk));
+      f.date = null; f.name = null; f.reason = '';
+      return loadChanges();
+    }
+    if (b.dataset.date) { f.date = b.dataset.date; f.name = null; f.reason = ''; return renderForm(); }
+    if (b.dataset.name) { f.name = b.dataset.name; return renderForm(); }
+    if (b.dataset.reason) { f.reason = f.reason === b.dataset.reason ? '' : b.dataset.reason; return renderForm(); }
+    if (b.dataset.act === 'save') return saveChange();
+
+    // Master scheduling
+    const dr = S.draft;
+    if (!dr) return;
+    const act = b.dataset.act;
+    const s = dr.staff.find(x => x.id === Number(b.dataset.id));
+    const i = Number(b.dataset.day);
+    if (act === 'savemaster') return saveMaster();
+    if (act === 'cancelmaster') { if (leaveDraft()) renderChanges(); return; }
+    if (act === 'filter') { dr.filter = b.dataset.filter; renderMaster(); refocus(b); return; }
+    if (act === 'remove' && !confirm('Remove ' + (s.name || 'this person') + ' from the team?')) return;
+    if (act === 'type') s.type = b.dataset.type;
+    else if (act === 'pause') s.active = !s.active;
+    else if (act === 'remove') dr.staff = dr.staff.filter(x => x !== s);
+    else if (act === 'day') s.days[i] = !s.days[i];
+    else if (act === 'new') dr.staff.unshift({ id: nextId++, name: '', was: '', type: dr.filter === 'all' ? '' : dr.filter, active: true, days: DAY.map(() => false) });
+    else if (act === 'inc' || act === 'dec') {
+      const n = dr.needed[b.dataset.type];
+      n[i] = Math.max(0, Math.min(99, n[i] + (act === 'inc' ? 1 : -1)));
+    }
+    else return;
+    dr.dirty = true;
+    dr.error = '';
+    renderMaster();
+    if (act === 'new') document.querySelector('#scForm .sc-name').focus();
+    else refocus(b);
+  });
+
+  // After redrawing, put the keyboard focus back on the same button.
+  function refocus(b) {
+    const sel = ['act', 'id', 'day', 'type', 'filter'].filter(k => b.dataset[k] !== undefined)
+      .map(k => '[data-' + k + '="' + b.dataset[k] + '"]').join('');
+    const el = document.querySelector('#scForm button' + sel);
+    if (el) el.focus({ preventScroll: true });
+  }
+
+  document.querySelector('.sc-views').addEventListener('click', e => {
+    const b = e.target.closest('button');
+    if (!b || b.dataset.view === S.view) return;
+    if (b.dataset.view === 'changes') { S.mode = null; S.form = null; }
+    showView(b.dataset.view);
+  });
+
+  return {
+    open() { showView(S.view); },
+  };
+})();
+</script>

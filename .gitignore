@@ -1,0 +1,7 @@
+.clasprc.json
+node_modules/
+preview/
+
+# Real supplier invoices used as samples: customer data, keep out of git.
+*.pdf
+*.PDF
