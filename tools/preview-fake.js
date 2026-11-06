@@ -158,7 +158,7 @@
   const google = {
     SpreadsheetApp: lenient({ getActiveSpreadsheet: () => ss, newDataValidation: () => lenient({ build: () => ({}) }) }),
     PropertiesService: { getScriptProperties: () => ({ getProperty: () => null, setProperty() {} }) },
-    LockService: { getScriptLock: () => ({ waitLock() {}, releaseLock() {} }) },
+    LockService: { getScriptLock: () => ({ waitLock() {}, tryLock: () => true, releaseLock() {} }) },
     Utilities: {
       formatDate(d, tz, f) {
         if (f === 'yyyy-MM-dd') return iso(d);

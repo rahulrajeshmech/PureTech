@@ -79,6 +79,10 @@ one global scope. Script and HTML files must not share a name.
 - Pallets: `_pallets` (hidden) holds `Pallet | Started | Finished`; an empty Finished is the open pallet (only one).
   New returns go on the open pallet. `setupReturns_` rewrites a pre-pallet Returns tab (B1 = `Part Number`)
   into the new layout with Pallet 1 / Quantity 1.
+- Saves run inside `withLock_` (one at a time, waits up to 30 s, then a plain "busy" message). Keep the work
+  inside it to a fixed number of Sheets calls: no call per row or per block. `paintBlocks_` colours a rebuilt
+  tab in three calls; formatting each block separately took over 20 s with a few hundred invoices and made
+  the next save fail with a lock timeout.
 - Sheet tabs: `Returns` (one row per return, newest first), `By Pallet` and `By Invoice` (rebuilt after every
   change by `rebuildAll_`), `_pallets`, `_pdf_cache` (hidden OCR cache); then `Schedule · Staff`, `Schedule · Base Week`, `Schedule · Needed`,
   `Schedule · Changes`; Receiving's `Receiving`, `Receiving · Week` sit after `By Invoice`, `_received` is hidden.

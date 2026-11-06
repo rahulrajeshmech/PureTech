@@ -112,9 +112,7 @@ function recordReturn(item, part, invoice, qty, category, comment) {
     throw new Error('The quantity must be a whole number from 1 to ' + MAX_QTY + '.');
   }
 
-  const lock = LockService.getScriptLock();
-  lock.waitLock(20000);
-  try {
+  return withLock_(function () {
     const sh = sheet_(RETURNS);
     ensureCommentColumn_(sh);
     const pallet = openPallet_();
@@ -128,9 +126,7 @@ function recordReturn(item, part, invoice, qty, category, comment) {
     }
     rebuildAll_();
     return { invoice: invoice, pallet: pallet, qty: qty, category: cat };
-  } finally {
-    lock.releaseLock();
-  }
+  });
 }
 
 /**
@@ -139,9 +135,7 @@ function recordReturn(item, part, invoice, qty, category, comment) {
  * (for invoices that were returned under a different email).
  */
 function undoReturn(item, part, invoice) {
-  const lock = LockService.getScriptLock();
-  lock.waitLock(20000);
-  try {
+  return withLock_(function () {
     const sh = sheet_(RETURNS);
     if (sh.getLastRow() < 2) throw new Error('There is no return to undo.');
     const rows = sh.getRange(2, 1, sh.getLastRow() - 1, RETURN_HEADERS.length).getValues();
@@ -161,9 +155,7 @@ function undoReturn(item, part, invoice) {
     sh.deleteRow(found + 2);
     rebuildAll_();
     return { invoice: String(rows[found][COL.invoice - 1]) };
-  } finally {
-    lock.releaseLock();
-  }
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -361,9 +353,12 @@ function rowId_(r) {
   return r[COL.key - 1] + '|' + (r[0] instanceof Date ? r[0].getTime() : String(r[0]));
 }
 
+/** Runs fn while no other save can run, waiting up to 30 seconds for one already running. */
 function withLock_(fn) {
   const lock = LockService.getScriptLock();
-  lock.waitLock(20000);
+  if (!lock.tryLock(30000)) {
+    throw new Error('PureTech is busy saving something else. Wait a few seconds and press the button again.');
+  }
   try {
     return fn();
   } finally {
@@ -643,6 +638,25 @@ function rebuildAll_() {
   rebuildByInvoice_();
 }
 
+/**
+ * Colours a rebuilt tab: green heading row, light green block rows (row numbers in groupRows).
+ * Done in three calls for the whole tab: one call per block took over 20 seconds once there
+ * were a few hundred invoices, which held up the next save.
+ */
+function paintBlocks_(out, nRows, nCols, groupRows) {
+  const group = {};
+  groupRows.forEach(function (r) { group[r] = true; });
+  const weights = [], backgrounds = [], colours = [];
+  for (let r = 1; r <= nRows; r++) {
+    const heading = r === 1;
+    const row = function (v) { return Array(nCols).fill(v); };
+    weights.push(row(heading || group[r] ? 'bold' : 'normal'));
+    backgrounds.push(row(heading ? '#1d7a3a' : group[r] ? '#e3f5e8' : null));
+    colours.push(row(heading ? '#ffffff' : null));
+  }
+  out.getRange(1, 1, nRows, nCols).setFontWeights(weights).setBackgrounds(backgrounds).setFontColors(colours);
+}
+
 /** Rebuilds the "By Pallet" tab: one block per pallet, newest first, listing what is on it. */
 function rebuildByPallet_() {
   const ss = ss_();
@@ -678,10 +692,7 @@ function rebuildByPallet_() {
   out.getRange(1, 1, values.length, 7).setNumberFormats(values.map(function () {
     return ['@', '@', '0', '@', 'd mmm yyyy', '@', '@'];
   })).setValues(values);
-  out.getRange(1, 1, 1, 7).setFontWeight('bold').setBackground('#1d7a3a').setFontColor('#ffffff');
-  groupRows.forEach(function (r) {
-    out.getRange(r, 1, 1, 7).setFontWeight('bold').setBackground('#e3f5e8');
-  });
+  paintBlocks_(out, values.length, 7, groupRows);
   out.setFrozenRows(1);
   [110, 220, 90, 160, 130, 90, 300].forEach(function (w, i) { out.setColumnWidth(i + 1, w); });
 }
@@ -720,10 +731,7 @@ function rebuildByInvoice_() {
   out.getRange(1, 1, values.length, 7).setNumberFormats(values.map(function () {
     return ['@', '@', '0', 'd mmm yyyy', '0', '@', '@'];
   })).setValues(values);
-  out.getRange(1, 1, 1, 7).setFontWeight('bold').setBackground('#1d7a3a').setFontColor('#ffffff');
-  groupRows.forEach(function (r) {
-    out.getRange(r, 1, 1, 7).setFontWeight('bold').setBackground('#e3f5e8');
-  });
+  paintBlocks_(out, values.length, 7, groupRows);
   out.setFrozenRows(1);
   [160, 160, 90, 130, 70, 90, 300].forEach(function (w, i) { out.setColumnWidth(i + 1, w); });
 }
