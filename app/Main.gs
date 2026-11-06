@@ -17,10 +17,12 @@ const SECTIONS = ['returns', 'receiving', 'scheduling'];
 
 function doGet(e) {
   // First time the page is opened (or after an upgrade): create the missing tabs.
-  // The "By Pallet" check also moves returns saved before pallets onto Pallet 1.
+  // The "By Pallet" check also moves returns saved before pallets onto Pallet 1, and the
+  // Comment check adds that column to sheets made before it.
   const ss = ss_();
-  if (!ss.getSheetByName(RETURNS) || !ss.getSheetByName(BY_PALLET) || !ss.getSheetByName(SCHED_STAFF)
-      || !ss.getSheetByName(RECEIVING)) setup();
+  const returns = ss.getSheetByName(RETURNS);
+  if (!returns || !ss.getSheetByName(BY_PALLET) || !ss.getSheetByName(SCHED_STAFF)
+      || !ss.getSheetByName(RECEIVING) || returns.getRange(1, COL.comment).getValue() !== 'Comment') setup();
   const page = HtmlService.createTemplateFromFile('Index');
   // ?section=scheduling or ?section=receiving opens that section straight away.
   const asked = e && e.parameter && e.parameter.section;

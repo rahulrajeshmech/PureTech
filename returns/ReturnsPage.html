@@ -53,6 +53,9 @@
                         border: 1px solid var(--line-strong); border-radius: 12px; background: var(--card); }
   .returns .fix input:focus { outline: none; border-color: var(--text); box-shadow: 0 0 0 1px var(--text); }
   .returns .hint { font-size: 15px; color: var(--muted); }
+  .returns .fix label span { font-weight: 400; color: var(--muted); }
+  .returns .fix input.note { text-transform: none; font-weight: 400; font-size: 20px; }
+  .returns .chosen .wide { flex-basis: 100%; }
   .returns .stepper { display: flex; align-items: center; width: max-content; border: 1px solid var(--line-strong);
                       border-radius: 12px; overflow: hidden; background: var(--card); }
   .returns .stepper button { width: 56px; height: 56px; font-size: 28px; font-weight: 500; }
@@ -78,6 +81,7 @@
   .returns .done .big { font-size: 104px; font-weight: 700; letter-spacing: -0.03em; line-height: 1.05;
                         font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
   .returns .done .sub { color: var(--muted); font-size: 17px; }
+  .returns .done .note { font-size: 17px; overflow-wrap: anywhere; }
   .returns .done .pallet { width: 100%; margin-top: 32px; padding: 18px 0; border-top: 1px solid var(--line);
                            border-bottom: 1px solid var(--line); display: flex; justify-content: space-between;
                            align-items: center; gap: 12px; }
@@ -106,6 +110,10 @@
   .returns .pline .what b { font-size: 20px; font-variant-numeric: tabular-nums; }
   .returns .pline .what em { font-style: normal; color: var(--muted); }
   .returns .pline .what span { display: block; color: var(--muted); font-size: 15px; }
+  .returns .pline .what .cmt { color: var(--text); font-size: 16px; overflow-wrap: anywhere; }
+  .returns .pick input { flex: 1 1 260px; min-width: 0; height: 48px; padding: 0 12px; font-size: 18px;
+                         border: 1px solid var(--line-strong); border-radius: 10px; background: var(--card); }
+  .returns .pick input:focus { outline: none; border-color: var(--text); box-shadow: 0 0 0 1px var(--text); }
   .returns .pick { flex-basis: 100%; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding-top: 4px; font-size: 16px; color: var(--muted); }
 </style>
 
@@ -134,6 +142,7 @@
     <p>Write this on the part</p>
     <div class="big" id="doneInvoice"></div>
     <div class="sub" id="doneSub"></div>
+    <div class="note" id="doneComment" hidden></div>
     <div class="pallet"><span id="donePut">Put it on</span><b id="donePallet"></b></div>
     <button class="btn primary" id="next">Next part</button>
     <button class="link" id="undo">Undo — that was a mistake</button>
@@ -159,11 +168,12 @@ const MAX_QTY = 999;
 
 // { part, search, loaded, items (not returned per Gmail key), returned, returnedInvoices, show,
 //   details: {key: {invoice, found, line, shipped}}, sel, typed, qty, shipped: {key: typed number},
-//   fixShipped, again: {key: true}, showReturned }
+//   fixShipped, again: {key: true}, showReturned, comment }
 let state = null;
 // From getPallets(), newest first: [{number, started, finished, open, qty}]
 let pallets = [];
-// The pallets screen: { show: pallet number or null for the list, lines, moving: id of the line being moved }
+// The pallets screen: { show: pallet number or null for the list, lines, moving: id of the line being moved,
+//   commenting: id of the line whose comment is being written }
 let pv = null;
 
 $('form').addEventListener('submit', e => {
@@ -302,7 +312,10 @@ function card(item) {
     + (sel ? '<div class="chosen">' + howMany(item)
         + '<div class="fix grow"><label for="invoiceFix">Invoice number</label>'
         + '<input type="text" id="invoiceFix" value="' + esc(currentInvoice()) + '">'
-        + '<span class="hint">Fix it if it does not match the PDF.</span></div></div>' : '')
+        + '<span class="hint">Fix it if it does not match the PDF.</span></div>'
+        + '<div class="fix wide"><label for="commentFix">Comment <span>(optional)</span></label>'
+        + '<input type="text" class="note" id="commentFix" maxlength="500" value="' + esc(state.comment || '') + '"></div>'
+        + '</div>' : '')
     + '</div>';
 }
 
@@ -355,7 +368,7 @@ function render() {
   }
   // Results re-render as PDFs finish reading; keep the cursor in the box being typed in.
   const active = document.activeElement;
-  const keep = active && (active.id === 'invoiceFix' || active.id === 'shippedFix')
+  const keep = active && ['invoiceFix', 'shippedFix', 'commentFix'].includes(active.id)
     ? { id: active.id, caret: active.selectionStart } : null;
 
   const list = available().sort((a, b) => rank(a) - rank(b) || b.dateIso.localeCompare(a.dateIso));
@@ -377,6 +390,8 @@ function render() {
   if (keep && $(keep.id)) { $(keep.id).focus(); $(keep.id).setSelectionRange(keep.caret, keep.caret); }
   const fix = $('invoiceFix');
   if (fix) fix.addEventListener('input', () => { state.typed = fix.value; updateButton(); });
+  const note = $('commentFix');
+  if (note) note.addEventListener('input', () => { state.comment = note.value; });
   const ship = $('shippedFix');
   if (ship) ship.addEventListener('input', () => {
     const n = parseInt(ship.value, 10);
@@ -444,7 +459,7 @@ $('results').addEventListener('keydown', e => {
 });
 
 function select(key) {
-  if (state.sel !== key) { state.sel = key; state.typed = undefined; state.qty = 1; state.fixShipped = false; }
+  if (state.sel !== key) { state.sel = key; state.typed = undefined; state.qty = 1; state.fixShipped = false; state.comment = ''; }
   render();
 }
 
@@ -455,12 +470,15 @@ $('returnBtn').addEventListener('click', async () => {
   $('returnBtn').disabled = true;
   $('returnBtn').textContent = 'Saving…';
   try {
-    const res = await call('recordReturn', item, state.part, invoice, state.qty);
+    const comment = (state.comment || '').trim();
+    const res = await call('recordReturn', item, state.part, invoice, state.qty, comment);
     state.last = { item, invoice: res.invoice };
     $('doneInvoice').textContent = res.invoice;
     $('doneSub').textContent = res.qty + ' × ' + state.part.toUpperCase() + ' · ' + item.supplier;
     $('donePut').textContent = 'Put ' + (res.qty > 1 ? 'them' : 'it') + ' on';
     $('donePallet').textContent = 'Pallet ' + res.pallet;
+    $('doneComment').textContent = 'Comment: ' + comment;
+    $('doneComment').hidden = !comment;
     showView('done');
     $('next').focus();
     loadPallets();
@@ -572,13 +590,19 @@ function renderPallets() {
   if (!p) { pv = { show: null }; renderPallets(); return; }
   const others = pallets.filter(x => x.number !== p.number).map(x => x.number).sort((a, b) => a - b);
   const line = l => '<div class="pline">'
-    + '<div class="what"><b>' + esc(l.part) + '</b> <em>× ' + l.qty + '</em><span>Invoice ' + esc(l.invoice) + ' · ' + esc(l.when) + '</span></div>'
+    + '<div class="what"><b>' + esc(l.part) + '</b> <em>× ' + l.qty + '</em><span>Invoice ' + esc(l.invoice) + ' · ' + esc(l.when) + '</span>'
+    + (l.comment ? '<span class="cmt">' + esc(l.comment) + '</span>' : '') + '</div>'
+    + '<button class="btn" data-comment="' + esc(l.id) + '">' + (l.comment ? 'Edit comment' : 'Add comment') + '</button>'
     + '<button class="btn" data-move="' + esc(l.id) + '">Move to pallet…</button>'
     + '<button class="btn danger" data-delete="' + esc(l.id) + '">Delete</button>'
     + (pv.moving === l.id ? '<div class="pick">' + (others.length
         ? 'Move to ' + others.map(n => '<button class="btn primary" data-to="' + n + '">Pallet ' + n + '</button>').join('')
         : 'There is no other pallet yet. Press New pallet first.')
       + '<button class="link" data-cancel="1">Cancel</button></div>' : '')
+    + (pv.commenting === l.id ? '<div class="pick">'
+        + '<input type="text" id="palletComment" maxlength="500" placeholder="Comment" aria-label="Comment" value="' + esc(l.comment) + '">'
+        + '<button class="btn primary" data-savecomment="1">Save</button>'
+        + '<button class="link" data-cancel="1">Cancel</button></div>' : '')
     + '</div>';
   $('palletsBody').innerHTML = '<h2 class="ptitle">Pallet ' + p.number + '</h2>'
     + '<p class="psub">' + esc(palletDates(p)) + ' · ' + partsText(p.qty) + '</p>'
@@ -589,7 +613,7 @@ function renderPallets() {
 }
 
 async function showPallet(number) {
-  pv = { show: number, lines: null, moving: null };
+  pv = { show: number, lines: null, moving: null, commenting: null };
   renderPallets();
   try {
     const lines = await call('getPallet', number);
@@ -603,8 +627,21 @@ $('palletsBody').addEventListener('click', async e => {
   const b = e.target.closest('button');
   if (!b) return;
   if (b.dataset.pallet) { showPallet(Number(b.dataset.pallet)); return; }
-  if (b.dataset.move) { pv.moving = pv.moving === b.dataset.move ? null : b.dataset.move; renderPallets(); return; }
-  if (b.dataset.cancel) { pv.moving = null; renderPallets(); return; }
+  if (b.dataset.move) {
+    pv.moving = pv.moving === b.dataset.move ? null : b.dataset.move;
+    pv.commenting = null;
+    renderPallets();
+    return;
+  }
+  if (b.dataset.comment) {
+    pv.commenting = pv.commenting === b.dataset.comment ? null : b.dataset.comment;
+    pv.moving = null;
+    renderPallets();
+    if (pv.commenting) $('palletComment').focus();
+    return;
+  }
+  if (b.dataset.savecomment) { saveComment(b); return; }
+  if (b.dataset.cancel) { pv.moving = null; pv.commenting = null; renderPallets(); return; }
   if (b.dataset.to) {
     b.disabled = true;
     try { setPallets(await call('moveToPallet', pv.moving, Number(b.dataset.to))); }
@@ -633,6 +670,29 @@ $('palletsBody').addEventListener('click', async e => {
     catch (err) { alert('Could not do that: ' + err.message); }
   }
 });
+
+// Enter in the comment box saves it, Escape cancels.
+$('palletsBody').addEventListener('keydown', e => {
+  if (e.target.id !== 'palletComment') return;
+  if (e.key === 'Enter') { e.preventDefault(); saveComment(e.target); }
+  if (e.key === 'Escape') { pv.commenting = null; renderPallets(); }
+});
+
+async function saveComment(from) {
+  const id = pv.commenting;
+  const text = $('palletComment').value;
+  from.disabled = true;
+  try {
+    const res = await call('setComment', id, text);
+    const l = pv.lines.find(x => x.id === id);
+    if (l) l.comment = res.comment;
+    pv.commenting = null;
+    renderPallets();
+  } catch (err) {
+    alert('Could not save the comment: ' + err.message);
+    from.disabled = false;
+  }
+}
 
 loadPallets();
 </script>

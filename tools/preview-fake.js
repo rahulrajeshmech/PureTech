@@ -4,7 +4,7 @@
 // code on pretend sheets; Gmail and the PDFs are replaced by a few demo invoices.
 // Changes are kept in this browser until "Reset demo data" is pressed.
 (function () {
-  const STORE = 'puretech-preview-v3';
+  const STORE = 'puretech-preview-v4';
   const pad = n => String(n).padStart(2, '0');
   const iso = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
   const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -23,7 +23,7 @@
       ['Sam', 'Driver', [0, 1, 2, 3, 4]], ['Tom', 'Driver', [2, 3, 4, 5]],
     ];
     return {
-      'Returns': [['Date Returned', 'Pallet', 'Part Number', 'Quantity', 'Invoice Number', 'Email Date', 'PDF File', 'Email', 'Key']],
+      'Returns': [['Date Returned', 'Pallet', 'Part Number', 'Quantity', 'Invoice Number', 'Email Date', 'PDF File', 'Email', 'Key', 'Comment']],
       'By Pallet': [[]],
       'By Invoice': [[]],
       '_pallets': [['Pallet', 'Started', 'Finished'], [1, today, '']],
@@ -188,7 +188,7 @@
     };
     return {
       getConfig, getReceivingList, readReceiving, saveReceiving, uncheckReceiving, getRecentProblems, setSorted, getWeekReport,
-      recordReturn, undoReturn, getPallets, getPallet, newPallet, reopenPallet, moveToPallet, deleteReturn, getWeek, setDayOff, addExtra, removeChange, saveMasterSchedule,
+      recordReturn, undoReturn, getPallets, getPallet, newPallet, reopenPallet, moveToPallet, deleteReturn, setComment, getWeek, setDayOff, addExtra, removeChange, saveMasterSchedule,
       searchPart(part) {
         part = String(part || '').trim();
         const out = { items: [], returned: [], returnedInvoices: [], show: SHOW_INVOICES };
