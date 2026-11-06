@@ -36,7 +36,7 @@ one global scope. Script and HTML files must not share a name.
 - `app/appsscript.json` — manifest (Gmail + Drive advanced services, web app settings).
 - `returns/Returns.gs` (was `Code.gs`) — Returns server: Gmail search (`searchPart`, `partQuery_`), PDF
   reading via Drive OCR (`readInvoice`, `pdfText_`, `guessInvoice_`, `guessQty_`), saving/undo (`recordReturn`,
-  `undoReturn`), pallets (`getPallets`, `getPallet`, `newPallet`, `reopenPallet`, `moveToPallet`, `deleteReturn`), tabs
+  `undoReturn`, `setComment`), pallets (`getPallets`, `getPallet`, `newPallet`, `reopenPallet`, `moveToPallet`, `deleteReturn`), tabs
   (`setupReturns_`, `moveToPalletLayout_`, `rebuildByPallet_`, `rebuildByInvoice_`).
 - `returns/ReturnsPage.html` — Returns section (CSS scoped under `.returns`): pallet bar, search, invoice cards
   with the quantity picker, done screen, pallets view.
@@ -66,7 +66,11 @@ one global scope. Script and HTML files must not share a name.
 - Shows up to `SHOW_INVOICES` (15) invoices where some of the part can still be returned. Shipped quantity
   comes from `guessQty_` (Vast-Auto lines `… EA ORDERED SHIPPED B/O price` take SHIPPED; else the first whole
   number after the part), or is typed in on the page; an invoice is used up when returned ≥ shipped.
-- Returns columns: Date Returned, Pallet, Part Number, Quantity, Invoice Number, Email Date, PDF File, Email, Key.
+- Returns columns: Date Returned, Pallet, Part Number, Quantity, Invoice Number, Email Date, PDF File, Email, Key,
+  Comment. Comment (J) was added after Key so older sheets keep their columns; `doGet` runs `setup` when J1 is not
+  `Comment`, and `setupReturns_` widens the old 9-column filter. `cleanComment_` trims to `MAX_COMMENT` (500) and
+  puts `'` before text starting `= + - @` so Sheets keeps it as text. Comments are set when returning or later
+  with `setComment(id, text)` from the pallet screen.
   A return is keyed by `normalisedPart|gmailMessageId:attachmentIndex` (hidden column I); the key repeats when
   more is returned later, so one row is identified by `rowId_` (key + `|` + date in ms).
 - Pallets: `_pallets` (hidden) holds `Pallet | Started | Finished`; an empty Finished is the open pallet (only one).
