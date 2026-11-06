@@ -52,6 +52,11 @@ if (artifact) {
     .replace('<header class="appbar">', '<style>.appbar .links { display: none; } body { background: var(--bg); }</style>\n<header class="appbar">')
     .replace('Parts to try in Returns: CH8115, BP4471, F44B.', 'Parts to try in Returns: CH8115, BP4471, F44B. Add #receiving or #scheduling to the link to open on that section.');
   if (/<\/?(html|head|body)\b/i.test(page)) throw new Error('Could not strip the page wrapper for the artifact build.');
+  // The artifact server publishes the file as it is, so it must be a whole document again,
+  // with everything in <body> (the section script sets document.body.dataset).
+  page = '<!DOCTYPE html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n'
+    + '<meta name="viewport" content="width=device-width, initial-scale=1">\n</head>\n<body>\n'
+    + page + '\n</body>\n</html>\n';
 }
 
 const out = join(root, 'preview', artifact ? 'PureTech-demo.html' : 'PureTech-preview.html');

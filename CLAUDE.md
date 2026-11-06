@@ -117,7 +117,8 @@ Bump `STORE` when the demo tabs change, so old browser data is dropped. Rebuild 
 owner can reload and look. If the server code starts using a new Google service, add it to the fake.
 
 `node tools/preview.mjs --artifact` builds `preview/PureTech-demo.html`, published as the live demo at
-https://claude.ai/artifact/UH6Por2eFhb5ntu2B4ZMSu (republish with that `url` to keep the link).
+https://claude.ai/artifact/UH6Por2eFhb5ntu2B4ZMSu (republish that artifact, e.g. `publish_files` with its slug
+and `as: index.html`, to keep the link).
 Published pages cannot show confirm() boxes, so that build answers them "yes".
 
 ## Getting changes into Google (manual, by the owner)
