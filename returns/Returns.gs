@@ -23,11 +23,10 @@ const BY_PALLET = 'By Pallet';
 const BY_INVOICE = 'By Invoice';
 const PALLETS = '_pallets';
 const CACHE = '_pdf_cache';
-// Comment was added last, after the hidden Key column, so older sheets keep their columns.
 const RETURN_HEADERS = ['Date Returned', 'Pallet', 'Part Number', 'Quantity', 'Invoice Number',
-  'Email Date', 'PDF File', 'Email', 'Key', 'Comment'];
-const COL = { date: 1, pallet: 2, part: 3, qty: 4, invoice: 5, email: 8, key: 9, comment: 10 };
-const MAX_COMMENT = 500;
+  'Category', 'Email Date', 'PDF File', 'Email', 'Key'];
+const COL = { date: 1, pallet: 2, part: 3, qty: 4, invoice: 5, category: 6, emailDate: 7, file: 8, email: 9, key: 10 };
+const CATEGORIES = ['Defect', 'Core', 'New Return'];
 
 // ---------------------------------------------------------------------------
 // Called from the page
@@ -100,10 +99,11 @@ function readInvoice(item, part) {
 }
 
 /** Saves the return on the open pallet and rebuilds the "By Pallet" and "By Invoice" tabs. */
-function recordReturn(item, part, invoice, qty, comment) {
+function recordReturn(item, part, invoice, qty, category) {
   part = String(part || '').trim().toUpperCase();
   invoice = String(invoice || '').trim().toUpperCase();
   qty = Number(qty === undefined ? 1 : qty);
+  const cat = CATEGORIES.includes(category) ? category : 'Defect';
   if (!part || !invoice) throw new Error('Part number and invoice number are both needed.');
   if (!(qty >= 1 && qty <= MAX_QTY && Math.floor(qty) === qty)) {
     throw new Error('The quantity must be a whole number from 1 to ' + MAX_QTY + '.');
@@ -115,15 +115,15 @@ function recordReturn(item, part, invoice, qty, comment) {
     const sh = sheet_(RETURNS);
     const pallet = openPallet_();
     const link = 'https://mail.google.com/mail/u/0/#all/' + item.threadId;
-    sh.appendRow([new Date(), pallet, part, qty, invoice, new Date(item.dateIso),
-      item.fileName, '', norm_(part) + '|' + item.key, cleanComment_(comment)]);
+    sh.appendRow([new Date(), pallet, part, qty, invoice, cat, new Date(item.dateIso),
+      item.fileName, '', norm_(part) + '|' + item.key]);
     const row = sh.getLastRow();
     sh.getRange(row, COL.email).setFormula('=HYPERLINK("' + link + '","Open")');
     if (row > 2) {
       sh.getRange(2, 1, row - 1, RETURN_HEADERS.length).sort({ column: COL.date, ascending: false });
     }
     rebuildAll_();
-    return { invoice: invoice, pallet: pallet, qty: qty };
+    return { invoice: invoice, pallet: pallet, qty: qty, category: cat };
   } finally {
     lock.releaseLock();
   }
@@ -183,9 +183,26 @@ function getPallet(number) {
   return returnRows_().filter(function (r) { return Number(r[COL.pallet - 1]) === number; })
     .map(function (r) {
       return { id: rowId_(r), part: String(r[COL.part - 1]), qty: Number(r[COL.qty - 1]) || 1,
-        invoice: String(r[COL.invoice - 1]), comment: String(r[COL.comment - 1] || ''),
+        invoice: String(r[COL.invoice - 1]),
+        category: String(r[COL.category - 1]) || 'Defect',
         when: r[0] instanceof Date ? Utilities.formatDate(r[0], tz, 'd MMM yyyy') : String(r[0]) };
     });
+}
+
+/** Changes the category of one return (by its id from getPallet). */
+function setCategory(id, category) {
+  if (!CATEGORIES.includes(category)) throw new Error('Category must be Defect, Core, or New Return.');
+  return withLock_(function () {
+    const rows = returnRows_();
+    for (let i = 0; i < rows.length; i++) {
+      if (rowId_(rows[i]) === id) {
+        sheet_(RETURNS).getRange(i + 2, COL.category).setValue(category);
+        rebuildAll_();
+        return getPallets();
+      }
+    }
+    throw new Error('That return was not found.');
+  });
 }
 
 /** Finishes the open pallet and starts the next one. */
@@ -241,30 +258,6 @@ function moveToPallet(id, number) {
     }
     throw new Error('That return was not found. It may have been undone.');
   });
-}
-
-/** Adds, changes or (when empty) clears the comment on one return (by its id from getPallet). */
-function setComment(id, comment) {
-  return withLock_(function () {
-    const rows = returnRows_();
-    for (let i = 0; i < rows.length; i++) {
-      if (rowId_(rows[i]) === id) {
-        sheet_(RETURNS).getRange(i + 2, COL.comment).setValue(cleanComment_(comment));
-        rebuildAll_();
-        return { comment: String(comment || '').trim().slice(0, MAX_COMMENT) };
-      }
-    }
-    throw new Error('That return was not found. It may have been deleted.');
-  });
-}
-
-/**
- * A comment as it is stored: trimmed and at most MAX_COMMENT characters. A leading
- * apostrophe stops Sheets reading text such as "=see note" or "-2 damaged" as a formula.
- */
-function cleanComment_(comment) {
-  const c = String(comment || '').replace(/\s+/g, ' ').trim().slice(0, MAX_COMMENT);
-  return /^[=+\-@]/.test(c) ? "'" + c : c;
 }
 
 /** Deletes one return (by its id from getPallet), the same as undoing it. */
@@ -337,16 +330,13 @@ function withLock_(fn) {
 function setupReturns_(ss) {
   let sh = ss.getSheetByName(RETURNS) || ss.insertSheet(RETURNS, 0);
   if (sh.getLastRow() > 0 && sh.getRange(1, 1, 1, 2).getValues()[0][1] === 'Part Number') moveToPalletLayout_(sh);
+  fixReturnsData_();
   sh.getRange(1, 1, 1, RETURN_HEADERS.length).setValues([RETURN_HEADERS])
     .setFontWeight('bold').setBackground('#1d7a3a').setFontColor('#ffffff');
   sh.setFrozenRows(1);
   formatReturns_(sh);
-  [170, 70, 140, 80, 140, 110, 200, 70].forEach(function (w, i) { sh.setColumnWidth(i + 1, w); });
-  sh.setColumnWidth(COL.comment, 300);
+  [170, 70, 140, 80, 140, 90, 110, 200, 70].forEach(function (w, i) { sh.setColumnWidth(i + 1, w); });
   sh.hideColumns(COL.key);
-  // Sheets made before the Comment column have a filter that stops at Key: widen it.
-  const filter = sh.getFilter();
-  if (filter && filter.getRange().getLastColumn() < RETURN_HEADERS.length) filter.remove();
   if (!sh.getFilter()) sh.getRange(1, 1, sh.getMaxRows(), RETURN_HEADERS.length).createFilter();
 
   if (!ss.getSheetByName(PALLETS)) {
@@ -374,7 +364,46 @@ function formatReturns_(sh) {
   sh.getRange('C:C').setNumberFormat('@');
   sh.getRange('D:D').setNumberFormat('0');
   sh.getRange('E:E').setNumberFormat('@');
-  sh.getRange('F:F').setNumberFormat('d mmm yyyy');
+  sh.getRange('F:F').setNumberFormat('@');
+  sh.getRange('G:G').setNumberFormat('d mmm yyyy');
+}
+
+/**
+ * Repairs rows saved before the Category column existed. Detects old-format rows by
+ * checking whether column 6 holds a Date (the old Email Date) instead of a category string,
+ * then rewrites those rows in the new 10-column layout with 'Defect' as the category.
+ * Safe to call on a sheet with mixed old and new rows.
+ */
+function fixReturnsData() {
+  return withLock_(function () {
+    return fixReturnsData_();
+  });
+}
+
+function fixReturnsData_() {
+  const sh = sheet_(RETURNS);
+  if (sh.getLastRow() < 2) return 'Nothing to fix.';
+  const n = sh.getLastRow() - 1;
+  const range = sh.getRange(2, 1, n, 10);
+  const data = range.getValues();
+  const formulas = range.getFormulas();
+  let fixed = 0;
+  const newData = data.map(function (r, i) {
+    const cat = r[5];
+    // Old row: col 6 holds a Date object OR a non-category string (date stored as text).
+    const isOld = cat instanceof Date ||
+      (typeof cat === 'string' && cat !== '' && !CATEGORIES.includes(cat));
+    if (isOld) {
+      fixed++;
+      return [r[0], r[1], r[2], r[3], r[4], 'Defect', cat, r[6], formulas[i][7] || r[7], r[8]];
+    }
+    return r;
+  });
+  if (fixed > 0) {
+    range.setValues(newData);
+    rebuildAll_();
+  }
+  return 'Fixed ' + fixed + ' row' + (fixed === 1 ? '' : 's') + '. ' + (n - fixed) + ' already correct.';
 }
 
 /**
@@ -390,8 +419,8 @@ function moveToPalletLayout_(sh) {
   const old = range.getValues();
   const formulas = range.getFormulas();
   formatReturns_(sh);
-  range.setValues(old.map(function (r, i) {
-    return [r[0], 1, String(r[1]), 1, String(r[2]), r[4], r[6], formulas[i][7] || r[7], r[8]];
+  sh.getRange(2, 1, n, 10).setValues(old.map(function (r, i) {
+    return [r[0], 1, String(r[1]), 1, String(r[2]), 'Defect', r[4], r[6], formulas[i][7] || r[7], r[8]];
   }));
 }
 
@@ -576,13 +605,14 @@ function rebuildByPallet_() {
   const day = function (d) { return d instanceof Date ? Utilities.formatDate(d, tz, 'd MMM yyyy') : String(d || ''); };
   const rows = returnRows_();
 
-  const values = [['Pallet', 'Part Number', 'Quantity', 'Invoice Number', 'Date Returned', 'Comment']];
+  const values = [['Pallet', 'Part Number', 'Quantity', 'Invoice Number', 'Date Returned', 'Category']];
   const groupRows = [];
   const block = function (title, status, g) {
     groupRows.push(values.length + 1);
     values.push([title, status, g.reduce(function (n, r) { return n + (Number(r[COL.qty - 1]) || 1); }, 0), '', '', '']);
     g.forEach(function (r) {
-      values.push(['', r[COL.part - 1], r[COL.qty - 1], r[COL.invoice - 1], r[COL.date - 1], r[COL.comment - 1] || '']);
+      values.push(['', r[COL.part - 1], r[COL.qty - 1], r[COL.invoice - 1], r[COL.date - 1],
+        String(r[COL.category - 1]) || 'Defect']);
     });
   };
   const list = pallets_();
@@ -605,7 +635,7 @@ function rebuildByPallet_() {
     out.getRange(r, 1, 1, 6).setFontWeight('bold').setBackground('#e3f5e8');
   });
   out.setFrozenRows(1);
-  [110, 220, 90, 160, 130, 300].forEach(function (w, i) { out.setColumnWidth(i + 1, w); });
+  [110, 220, 90, 160, 130, 90].forEach(function (w, i) { out.setColumnWidth(i + 1, w); });
 }
 
 /** Rebuilds the "By Invoice" tab: one block per invoice number, listing the parts returned. */
@@ -625,7 +655,7 @@ function rebuildByInvoice_() {
     return a.toLowerCase() < b.toLowerCase() ? -1 : 1;
   });
 
-  const values = [['Invoice Number', 'Part Number', 'Quantity', 'Date Returned', 'Pallet', 'Comment']];
+  const values = [['Invoice Number', 'Part Number', 'Quantity', 'Date Returned', 'Pallet', 'Category']];
   const groupRows = [];
   keys.forEach(function (k) {
     const g = groups[k].sort(function (a, b) {
@@ -634,7 +664,8 @@ function rebuildByInvoice_() {
     groupRows.push(values.length + 1);
     values.push([k, 'Total returned', g.reduce(function (n, r) { return n + (Number(r[COL.qty - 1]) || 1); }, 0), '', '', '']);
     g.forEach(function (r) {
-      values.push(['', r[COL.part - 1], r[COL.qty - 1], r[COL.date - 1], r[COL.pallet - 1], r[COL.comment - 1] || '']);
+      values.push(['', r[COL.part - 1], r[COL.qty - 1], r[COL.date - 1], r[COL.pallet - 1],
+        String(r[COL.category - 1]) || 'Defect']);
     });
   });
 
@@ -646,5 +677,5 @@ function rebuildByInvoice_() {
     out.getRange(r, 1, 1, 6).setFontWeight('bold').setBackground('#e3f5e8');
   });
   out.setFrozenRows(1);
-  [160, 160, 90, 130, 70, 300].forEach(function (w, i) { out.setColumnWidth(i + 1, w); });
+  [160, 160, 90, 130, 70, 90].forEach(function (w, i) { out.setColumnWidth(i + 1, w); });
 }
